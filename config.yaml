@@ -1,0 +1,21 @@
+llm:
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 8192
+  retry_count: 3
+  retry_delay_base: 2  # 指数退避基数（秒）
+
+compile:
+  max_file_size_kb: 50       # 超过此大小分段处理
+  budget_limit_usd: 5.0      # 单次 compile 费用上限
+  input_price_per_mtok: 3.0  # Sonnet 输入价格
+  output_price_per_mtok: 15.0 # Sonnet 输出价格
+
+wiki:
+  language: "zh"             # wiki 条目语言
+  min_entry_length: 100      # 最小条目字数
+
+paths:
+  raw: "raw"
+  wiki: "wiki"
+  state: ".state"
+  templates: "templates"
