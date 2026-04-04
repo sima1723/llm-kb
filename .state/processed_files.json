@@ -28,5 +28,17 @@
       "wiki/INDEX.md"
     ],
     "processed_at": "2026-04-04T13:58:49.703869"
+  },
+  "raw/articles/test-transformer.md": {
+    "hash": "a88700a286f8a842cb25c275408c5c62a1c4184e02103a4acc9ffdc845fe3d05",
+    "outputs": [
+      "wiki/Transformer架构.md",
+      "wiki/自注意力.md",
+      "wiki/多头注意力.md",
+      "wiki/位置编码.md",
+      "wiki/RoPE.md",
+      "wiki/INDEX.md"
+    ],
+    "processed_at": "2026-04-04T14:00:23.542478"
   }
 }
