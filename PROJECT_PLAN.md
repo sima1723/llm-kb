@@ -1,5 +1,42 @@
 # LLM Knowledge Base 项目计划
 
+## 零、进度追踪（持续更新）
+
+| Task | 描述 | 状态 | Commit |
+|------|------|------|--------|
+| 0.1 | 创建目录结构 | ✅ | 82ea9cd |
+| 0.2 | 创建 config.yaml | ✅ | fa07b4e |
+| 0.3 | 创建 Prompt 模板 | ✅ | 5e412b1 |
+| 0.4 | 状态管理模块 state.py | ✅ | 2097d22 |
+| 1.1 | PDF 提取工具 pdf_to_md.py | ✅ | e3eae23 |
+| 1.2 | 网页抓取工具 web_to_md.py | ✅ | 53055c0 |
+| 1.3 | 手动笔记模板 new_note.py | ✅ | 82d9b13 |
+| 2.1 | API 调用封装 llm_client.py | ✅ | 2097d22 |
+| 2.2 | XML 解析器 parser.py | ✅ | 9974584 |
+| 2.3 | 文件分段器 chunker.py | ✅ | a482a0d |
+| 2.4 | 编译主引擎 compile_wiki.py | ✅ | fc3e96d |
+| 2.5 | INDEX 生成器 indexer.py | ✅ | 2828380 |
+| 2.6 | 合并编译（多 chunk 智能合并） | 🔄 进行中 | — |
+| 2.7 | 编译集成测试 | ⏳ | — |
+| 3.1 | TF-IDF 搜索引擎 search.py | ⏳ | — |
+| 3.2 | 问答工具 ask.py（含答案回流） | ⏳ | — |
+| 3.3 | Marp 幻灯片 slides.py | ⏳ | — |
+| 3.4 | 导出报告 report.py | ⏳ | — |
+| 3.5 | 查询层集成测试 | ⏳ | — |
+| 4.1 | 本地 Lint 检查 lint.py | ⏳ | — |
+| 4.2 | AI Lint 修复 | ⏳ | — |
+| 4.3 | 知识探索建议 explore.py | ⏳ | — |
+| 4.4 | 统计仪表盘 stats.py | ⏳ | — |
+| 5.1 | Makefile | ⏳ | — |
+| 5.2 | README.md | ⏳ | — |
+| 5.3 | 初始化脚本 init_project.py | ⏳ | — |
+| 5.4 | 全流程端到端测试 | ⏳ | — |
+| 5.5 | 清理与交付 | ⏳ | — |
+
+> 状态说明：✅ 完成 | 🔄 进行中 | ⏳ 待开始 | ❌ 失败需修复
+
+---
+
 ## 一、架构验证：你的理解 vs 补充
 
 你的理解 ✅ 完全正确。补充两个关键闭环：
@@ -454,15 +491,51 @@ CLI 入口：
 #### Task 2.6 — 合并编译（处理分段文件的最终合并）
 ```
 前置：Task 2.4
-在 compile_wiki.py 中实现（不是独立文件）
+改动文件：
+  - templates/merge.txt         ← 新增合并 prompt 模板
+  - tools/compile_wiki.py       ← 新增 merge_chunk_entries()，替换旧去重逻辑
 
-当一个大文件被分成 N 个 chunk 分别编译后：
-  1. 收集所有 chunk 产生的 wiki 条目
-  2. 构造合并 prompt：
-     "以下条目可能有重复或不完整，请合并为最终版本：[各chunk产出]"
-  3. 用合并后的版本覆盖之前的条目
+【templates/merge.txt 内容】
+----
+你是知识库编译器。语言：{language}
 
-验证：创建一个 >50KB 的测试文件，编译后检查 wiki 条目无重复
+以下条目来自同一文档的不同片段，可能有内容重复或不完整。
+请将同名条目合并为一个最终完整版本。
+
+<entries_to_merge>
+{entries_content}
+</entries_to_merge>
+
+合并规则：
+1. 保留所有独特信息，去除重复内容
+2. 合并 related_concepts 列表（去重，保持列表格式）
+3. 合并 sources 列表（去重）
+4. last_updated 保持原值不变
+5. [[链接]] 全部保留
+
+输出格式（与编译格式完全一致）：
+<wiki_entry>
+<filename>概念名.md</filename>
+<action>update</action>
+<content>
+（合并后的完整 Markdown 内容）
+</content>
+</wiki_entry>
+----
+
+【compile_wiki.py 新增函数】
+def merge_chunk_entries(all_entries, client, merge_template, language) -> list:
+  1. 按 filename 分组 all_entries
+  2. 没有重复的直接保留
+  3. 有重复的（同名出现 >1 次）：构造合并 prompt → 调 LLM → 解析结果
+  4. 失败时降级为保留最后一个版本（不中断流程）
+  返回合并后的条目列表
+
+【替换位置】compile_wiki.py 第 181-186 行（当前的简单去重逻辑）：
+  旧：merged = {}; for entry in all_entries: merged[entry["filename"]] = entry
+  新：调用 merge_chunk_entries()，失败时回退到旧逻辑
+
+验证：创建一个 >50KB 的测试文件，编译后检查 wiki 条目无重复内容
 ```
 
 #### Task 2.7 — 编译集成测试
