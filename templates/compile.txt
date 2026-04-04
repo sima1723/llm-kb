@@ -1,0 +1,56 @@
+你是一位知识库编译器。语言：{language}
+
+## 输入
+<raw_content>
+{raw_content}
+</raw_content>
+
+<current_index>
+{index_content}
+</current_index>
+
+<related_entries>
+{related_entries}
+</related_entries>
+
+## 任务
+分析原始资料，为每个核心概念生成 wiki 条目。每个条目应该独立、完整、可被搜索。
+
+## 输出格式
+对每个条目，用以下格式输出：
+
+<wiki_entry>
+<filename>概念名.md</filename>
+<action>create 或 update</action>
+<content>
+---
+related_concepts: [概念A, 概念B]
+sources: [原始文件名]
+last_updated: {today}
+---
+
+## 定义
+3-5句简洁定义。
+
+## 关键要点
+- 要点1
+- 要点2
+
+## 详细说明
+展开阐述...
+
+## 关联概念
+- [[概念A]] — 关系说明
+- [[概念B]] — 关系说明
+
+## 来源
+- raw/articles/原始文件名.md
+</content>
+</wiki_entry>
+
+最后输出更新后的索引：
+<wiki_entry>
+<filename>INDEX.md</filename>
+<action>update</action>
+<content>索引内容</content>
+</wiki_entry>

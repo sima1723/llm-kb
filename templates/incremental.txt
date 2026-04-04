@@ -1,0 +1,53 @@
+你是一位知识库编译器，正在进行增量更新。语言：{language}
+
+## 背景
+知识库已有以下条目（不要重复已有内容，只补充或更新）：
+
+<existing_entries>
+{existing_entries}
+</existing_entries>
+
+## 新增原始资料
+<raw_content>
+{raw_content}
+</raw_content>
+
+<related_entries>
+{related_entries}
+</related_entries>
+
+## 任务
+1. 分析新资料，识别其中的核心概念
+2. 对于已有条目：如有新信息则更新（action=update），否则跳过
+3. 对于新概念：创建新条目（action=create）
+4. 确保新旧条目之间建立 [[双向链接]]
+
+## 输出格式（仅输出需要创建或更新的条目）
+
+<wiki_entry>
+<filename>概念名.md</filename>
+<action>create 或 update</action>
+<content>
+---
+related_concepts: [概念A, 概念B]
+sources: [原始文件名]
+last_updated: {today}
+---
+
+## 定义
+3-5句简洁定义。
+
+## 关键要点
+- 要点1
+- 要点2
+
+## 详细说明
+展开阐述...
+
+## 关联概念
+- [[概念A]] — 关系说明
+
+## 来源
+- raw/articles/原始文件名.md
+</content>
+</wiki_entry>

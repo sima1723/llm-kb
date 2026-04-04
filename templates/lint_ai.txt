@@ -1,0 +1,38 @@
+你是一位知识库维护专家。请修复以下知识库条目中存在的问题。语言：{language}
+
+## 检测到的问题
+
+<issues>
+{issues}
+</issues>
+
+## 相关条目内容
+
+<entries>
+{entries}
+</entries>
+
+## 修复任务
+针对每个问题，输出修复后的完整条目内容。
+
+修复原则：
+1. 解决内容矛盾：以更详细、更新的来源为准，保留两种观点时注明分歧
+2. 补充缺失关联：在相关条目中添加互相引用的 [[链接]]
+3. 合并重复条目：保留更完整的内容，从简单条目中补充独有信息
+4. 保持原有格式和 frontmatter 结构
+
+## 输出格式
+
+<wiki_entry>
+<filename>条目名.md</filename>
+<action>update</action>
+<content>
+修复后的完整条目内容
+</content>
+</wiki_entry>
+
+如果问题无法自动修复，输出：
+<unfixable>
+<filename>条目名.md</filename>
+<reason>无法修复的原因，建议人工处理的方式</reason>
+</unfixable>
