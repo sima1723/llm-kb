@@ -1,1 +1,19 @@
-{}
+{
+  "logs": [
+    {
+      "file": "raw/articles/test-llm-basics.md",
+      "outputs": [
+        "wiki/大语言模型.md",
+        "wiki/注意力机制.md",
+        "wiki/预训练.md",
+        "wiki/微调.md",
+        "wiki/涌现能力.md",
+        "wiki/上下文学习.md",
+        "wiki/思维链推理.md",
+        "wiki/INDEX.md"
+      ],
+      "cost_usd": 0.072822,
+      "logged_at": "2026-04-04T13:58:14.035621"
+    }
+  ]
+}

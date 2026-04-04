@@ -48,8 +48,19 @@ class LLMClient:
         self.input_price = compile_cfg.get("input_price_per_mtok", 3.0)   # per 1M tokens
         self.output_price = compile_cfg.get("output_price_per_mtok", 15.0)
 
+        # 认证：优先使用 ANTHROPIC_API_KEY，其次尝试 Claude Code 的 OAuth Bearer token
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        self.client = self._anthropic.Anthropic(api_key=api_key)
+        if api_key:
+            self.client = self._anthropic.Anthropic(api_key=api_key)
+        else:
+            # Claude Code 远程环境：从 session ingress token 文件读取 Bearer token
+            token_file = os.environ.get("CLAUDE_SESSION_INGRESS_TOKEN_FILE", "")
+            if token_file and os.path.exists(token_file):
+                auth_token = open(token_file).read().strip()
+                self.client = self._anthropic.Anthropic(auth_token=auth_token)
+            else:
+                # 让 SDK 自行从环境变量中查找
+                self.client = self._anthropic.Anthropic()
 
         # 累计统计
         self._calls = 0
