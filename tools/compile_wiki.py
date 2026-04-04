@@ -86,6 +86,51 @@ def find_related_entries(query_content: str, wiki_dir: str, top_k: int = 3) -> s
     return "\n\n".join(parts) if parts else "（暂无相关条目）"
 
 
+def merge_chunk_entries(
+    all_entries: list,
+    client: LLMClient,
+    merge_template: str,
+    language: str,
+) -> list:
+    """
+    对多 chunk 产生的同名条目做 LLM 合并。
+    无重复时直接返回；有重复时构造合并 prompt 调 LLM，失败则降级为保留最后一个。
+    """
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for entry in all_entries:
+        grouped[entry["filename"]].append(entry)
+
+    final = []
+    needs_merge = []
+
+    for fname, group in grouped.items():
+        if len(group) == 1:
+            final.append(group[0])
+        else:
+            needs_merge.append((fname, group))
+
+    if not needs_merge:
+        return final
+
+    parts = []
+    for fname, group in needs_merge:
+        for i, entry in enumerate(group):
+            parts.append(
+                "=== {} (片段 {}/{}) ===\n{}".format(fname, i + 1, len(group), entry["content"])
+            )
+
+    prompt = merge_template.format(
+        language=language,
+        entries_content="\n\n".join(parts),
+    )
+
+    response = client.call(prompt)
+    merged = parse_wiki_entries(response)
+    final.extend(merged)
+    return final
+
+
 def write_wiki_entries(entries: list, wiki_dir: str) -> list:
     """
     将解析后的条目写入 wiki/ 目录。
@@ -178,12 +223,22 @@ def compile_single_file(
             console.print(f"  [red]✗ 编译失败 ({chunk_label}): {error_msg[:80]}[/red]")
             return []
 
-    # 如果多 chunk，做一次合并去重（同名文件保留最后一个）
+    # 如果多 chunk，用 LLM 智能合并同名条目（降级时保留最后一个）
     if len(chunks) > 1:
-        merged = {}
-        for entry in all_entries:
-            merged[entry["filename"]] = entry
-        all_entries = list(merged.values())
+        templates_dir = config["paths"]["templates"]
+        merge_tmpl = load_template(templates_dir, "merge.txt")
+        language = config["wiki"]["language"]
+        try:
+            all_entries = merge_chunk_entries(all_entries, client, merge_tmpl, language)
+            console.print(
+                "  [dim]合并 {} 个 chunk → {} 个条目[/dim]".format(len(chunks), len(all_entries))
+            )
+        except Exception as e:
+            console.print("  [yellow]⚠ 合并失败，降级为简单去重: {}[/yellow]".format(e))
+            deduped = {}
+            for entry in all_entries:
+                deduped[entry["filename"]] = entry
+            all_entries = list(deduped.values())
 
     written = write_wiki_entries(all_entries, wiki_dir)
 

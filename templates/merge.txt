@@ -1,0 +1,47 @@
+你是知识库编译器。语言：{language}
+
+以下条目来自同一文档的不同片段，可能有内容重复或不完整。
+请将同名条目合并为一个最终完整版本。
+
+<entries_to_merge>
+{entries_content}
+</entries_to_merge>
+
+## 合并规则
+1. 保留所有独特信息，去除重复内容
+2. 合并 related_concepts 列表（去重，保持列表格式）
+3. 合并 sources 列表（去重）
+4. last_updated 保持原值不变
+5. [[链接]] 全部保留
+
+## 输出格式（与编译格式完全一致）
+
+对每个需要合并的条目，输出：
+
+<wiki_entry>
+<filename>概念名.md</filename>
+<action>update</action>
+<content>
+---
+related_concepts: [概念A, 概念B]
+sources: [原始文件名]
+last_updated: （保持原值）
+---
+
+## 定义
+合并后的完整定义。
+
+## 关键要点
+- 合并后的要点（去重）
+
+## 详细说明
+合并后的详细内容。
+
+## 关联概念
+- [[概念A]] — 关系说明
+- [[概念B]] — 关系说明
+
+## 来源
+- raw/articles/原始文件名.md
+</content>
+</wiki_entry>
