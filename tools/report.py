@@ -30,6 +30,7 @@ sys.path.insert(0, str(_HERE))
 
 from tools.search import search_wiki
 from tools.llm_client import LLMClient
+from tools.ask import _truncate_entry
 
 console = Console() if HAS_RICH else None
 
@@ -112,7 +113,7 @@ def main(topic: str, fmt: str, top_k: int, wiki_dir: Optional[str]):
     for r in results:
         fp = Path(r["filepath"])
         if fp.exists():
-            content = fp.read_text(encoding="utf-8", errors="ignore")[:max_chars_per_entry]
+            content = _truncate_entry(fp.read_text(encoding="utf-8", errors="ignore"), max_chars_per_entry)
             entries_text.append(f"=== {r['filename']} ===\n{content}")
             source_files.append(r["filename"])
 
