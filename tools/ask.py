@@ -88,7 +88,7 @@ def _truncate_entry(content: str, max_chars: int) -> str:
     return content[:cut] if cut > max_chars // 2 else content[:max_chars]
 
 
-
+def build_context(question: str, wiki_dir: Path, deep: bool = False, top_k: int = 5) -> tuple[str, list[str]]:
     """
     构建问答上下文：搜索相关 wiki 条目，deep 模式下递归读取一层链接。
     返回 (context_text, source_files)

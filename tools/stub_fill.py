@@ -178,7 +178,7 @@ def fill_stub(stub_path: Path, client: LLMClient, config: dict) -> bool:
     )
 
     try:
-        response = client.chat(prompt)
+        response = client.call(prompt)
     except BudgetExceeded as e:
         if console:
             console.print(f"[red]预算超出，停止填充：{e}[/red]")

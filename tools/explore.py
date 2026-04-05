@@ -29,6 +29,7 @@ _HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_HERE))
 
 from tools.llm_client import LLMClient
+from tools.indexer import regenerate_index
 
 console = Console() if HAS_RICH else None
 
@@ -211,7 +212,13 @@ def main(add: bool, dry_run: bool, wiki_dir: Optional[str]):
                 console.print(f"\n[bold]将为以下概念创建 stub 条目:[/bold] {', '.join(concepts)}")
             else:
                 print(f"\n将为以下概念创建 stub: {', '.join(concepts)}")
-            create_stubs(concepts, wd, dry_run)
+            created = create_stubs(concepts, wd, dry_run)
+            # 重建 INDEX.md 使新 stub 立即可见
+            if created and not dry_run:
+                try:
+                    regenerate_index(str(wd))
+                except Exception:
+                    pass
         else:
             if HAS_RICH:
                 console.print("[yellow]未能解析出待填充概念，请手动创建[/yellow]")

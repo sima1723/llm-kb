@@ -30,6 +30,7 @@ from tools.state import StateManager
 from tools.llm_client import LLMClient, BudgetExceeded
 from tools.parser import parse_wiki_entries
 from tools.chunker import chunk_file
+from tools.indexer import regenerate_index
 
 console = Console()
 logging.basicConfig(level=logging.WARNING)
@@ -359,6 +360,13 @@ def main(full, dry_run, single_file, config_path, do_git_commit, skip_git_commit
                 failed += 1
 
             progress.advance(task)
+
+    # 重建 INDEX.md（确保新条目被索引）
+    if success > 0:
+        try:
+            regenerate_index(wiki_dir)
+        except Exception as e:
+            console.print(f"[yellow]⚠ INDEX 重建失败: {e}[/yellow]")
 
     # 最终费用报告
     summary = client.get_cost_summary()
