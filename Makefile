@@ -6,7 +6,7 @@ TOOLS  := tools
 
 .PHONY: help init extract clip note compile compile-full \
         search ask ask-save slides report lint lint-fix lint-ai \
-        explore stats status
+        explore explore-add stub-fill stub-fill-dry stats status
 
 ## help: 显示帮助信息
 help:
@@ -114,6 +114,18 @@ explore:
 ## explore-add: 探索建议并自动创建 stub 条目
 explore-add:
 	$(PYTHON) $(TOOLS)/explore.py --add
+
+## stub-fill: 用 LLM 填充所有"待补充"stub 条目  (ENTRY=条目名，可选)
+stub-fill:
+	@if [ -n "$(ENTRY)" ]; then \
+		$(PYTHON) $(TOOLS)/stub_fill.py --entry "$(ENTRY)"; \
+	else \
+		$(PYTHON) $(TOOLS)/stub_fill.py; \
+	fi
+
+## stub-fill-dry: 预览待填充 stub 列表（不调用 API）
+stub-fill-dry:
+	$(PYTHON) $(TOOLS)/stub_fill.py --dry-run
 
 ## stats: 统计仪表盘
 stats:

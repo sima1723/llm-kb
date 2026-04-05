@@ -74,6 +74,9 @@ make ask-save Q="什么是 Transformer?"
 | `make lint-ai` | 调用 AI 修复复杂问题 |
 | `make explore` | 分析知识库，给出探索方向建议 |
 | `make explore-add` | 探索建议 + 自动创建 stub 条目 |
+| `make stub-fill` | 用 LLM 填充所有"待补充"stub 条目 |
+| `make stub-fill ENTRY=<条目名>` | 只填充指定 stub 条目 |
+| `make stub-fill-dry` | 预览待填充列表（不调用 API） |
 | `make stats` | 统计仪表盘 |
 | `make status` | 快速状态（待处理数 + 条目数） |
 
