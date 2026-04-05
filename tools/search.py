@@ -164,7 +164,7 @@ def highlight_snippet(snippet: str, query_tokens: list[str]) -> "Text":
         return snippet
     text = Text(snippet)
     for qt in query_tokens:
-        text.highlight_regex(re.escape(qt), style="bold yellow", case_sensitive=False)
+        text.highlight_regex(re.escape(qt), style="bold yellow")
     return text
 
 
