@@ -70,7 +70,25 @@ def _extract_links(content: str) -> list[str]:
     return re.findall(r'\[\[(.+?)\]\]', content)
 
 
-def build_context(question: str, wiki_dir: Path, deep: bool = False, top_k: int = 5) -> tuple[str, list[str]]:
+def _truncate_entry(content: str, max_chars: int) -> str:
+    """
+    截断条目内容，优先在段落边界（双换行）处断开，
+    避免 LLM 读到半截句子。丢弃"## 来源"之后的内容（最不重要）。
+    """
+    if len(content) <= max_chars:
+        return content
+    # 先尝试去掉"来源"节以减小体积
+    source_idx = content.find("\n## 来源")
+    if source_idx != -1 and source_idx > max_chars // 2:
+        content = content[:source_idx]
+    if len(content) <= max_chars:
+        return content
+    # 在 max_chars 附近找最近的段落分隔（双换行）
+    cut = content.rfind("\n\n", 0, max_chars)
+    return content[:cut] if cut > max_chars // 2 else content[:max_chars]
+
+
+
     """
     构建问答上下文：搜索相关 wiki 条目，deep 模式下递归读取一层链接。
     返回 (context_text, source_files)
@@ -88,7 +106,7 @@ def build_context(question: str, wiki_dir: Path, deep: bool = False, top_k: int 
     for r in results:
         fp = Path(r["filepath"])
         if fp.exists():
-            loaded_files[r["filename"]] = _read_entry(fp)[:MAX_CHARS]
+            loaded_files[r["filename"]] = _truncate_entry(_read_entry(fp), MAX_CHARS)
 
     # deep 模式：递归一层链接
     if deep:
@@ -99,7 +117,7 @@ def build_context(question: str, wiki_dir: Path, deep: bool = False, top_k: int 
                 lk_path = wiki_dir / f"{lk}.md"
                 lk_rel = f"{lk}.md"
                 if lk_rel not in loaded_files and lk_rel not in extra and lk_path.exists():
-                    extra[lk_rel] = _read_entry(lk_path)[:MAX_CHARS]
+                    extra[lk_rel] = _truncate_entry(_read_entry(lk_path), MAX_CHARS)
         loaded_files.update(extra)
 
     context_text = "\n\n".join(
