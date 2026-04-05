@@ -105,19 +105,22 @@ def main(topic: str, fmt: str, top_k: int, wiki_dir: Optional[str]):
             print(msg)
         return
 
-    # 读取条目内容
+    # brief 只需摘要，1000 字符/条目够用；完整报告保留 3000 字符
+    max_chars_per_entry = 1000 if fmt == "brief" else 3000
     entries_text = []
     source_files = []
     for r in results:
         fp = Path(r["filepath"])
         if fp.exists():
-            content = fp.read_text(encoding="utf-8", errors="ignore")
+            content = fp.read_text(encoding="utf-8", errors="ignore")[:max_chars_per_entry]
             entries_text.append(f"=== {r['filename']} ===\n{content}")
             source_files.append(r["filename"])
 
     wiki_entries = "\n\n".join(entries_text)
 
-    # 选择 prompt
+    # 选择 prompt 和 max_tokens
+    tool_key = "report_brief" if fmt == "brief" else "report_md"
+    report_max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get(tool_key)
     if fmt == "md":
         prompt = _PROMPT_MD.format(topic=topic, language=language, wiki_entries=wiki_entries)
     else:
@@ -127,10 +130,10 @@ def main(topic: str, fmt: str, top_k: int, wiki_dir: Optional[str]):
     client = LLMClient(config)
     if HAS_RICH:
         with console.status("[cyan]正在生成报告...[/cyan]"):
-            report_content = client.call(prompt)
+            report_content = client.call(prompt, max_tokens=report_max_tokens)
     else:
         print("正在生成报告...")
-        report_content = client.call(prompt)
+        report_content = client.call(prompt, max_tokens=report_max_tokens)
 
     # 打印报告
     if HAS_RICH:

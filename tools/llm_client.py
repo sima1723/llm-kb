@@ -7,6 +7,7 @@ LLM API 调用封装：支持重试、费用控制、token 统计。
 import os
 import time
 import logging
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ class LLMClient:
             # Claude Code 远程环境：从 session ingress token 文件读取 Bearer token
             token_file = os.environ.get("CLAUDE_SESSION_INGRESS_TOKEN_FILE", "")
             if token_file and os.path.exists(token_file):
-                auth_token = open(token_file).read().strip()
+                auth_token = Path(token_file).read_text().strip()
                 self.client = self._anthropic.Anthropic(auth_token=auth_token)
             else:
                 # 让 SDK 自行从环境变量中查找
@@ -75,21 +76,24 @@ class LLMClient:
             + output_tokens / 1_000_000 * self.output_price
         )
 
-    def call(self, prompt: str, system: Optional[str] = None) -> str:
+    def call(self, prompt: str, system: Optional[str] = None,
+             max_tokens: Optional[int] = None) -> str:
         """
         调用 LLM API，返回纯文本响应。
 
         参数：
-          prompt: 用户消息
-          system: 系统提示（可选）
+          prompt:     用户消息
+          system:     系统提示（可选）
+          max_tokens: 覆盖默认 max_tokens（用于简单任务节省成本）
 
         抛出：
           BudgetExceeded: 累计费用超出 budget_limit_usd
-          Exception: 重试耗尽后仍失败
+          Exception:      重试耗尽后仍失败
         """
+        effective_max_tokens = max_tokens or self.max_tokens
         # 预检费用（粗估：prompt 长度 / 4 ≈ token 数）
         estimated_input = len(prompt) // 4
-        estimated_cost = self._calc_cost(estimated_input, self.max_tokens)
+        estimated_cost = self._calc_cost(estimated_input, effective_max_tokens)
         if self._cost_usd + estimated_cost > self.budget_limit:
             raise BudgetExceeded(
                 f"预算保护：累计费用 ${self._cost_usd:.3f}，"
@@ -100,7 +104,7 @@ class LLMClient:
         messages = [{"role": "user", "content": prompt}]
         kwargs = {
             "model": self.model,
-            "max_tokens": self.max_tokens,
+            "max_tokens": effective_max_tokens,
             "messages": messages,
         }
         if system:

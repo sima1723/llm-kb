@@ -168,6 +168,32 @@ def highlight_snippet(snippet: str, query_tokens: list[str]) -> "Text":
     return text
 
 
+# ─── 语料库缓存（避免每次搜索重建，基于文件 mtime 失效）────────────────────
+
+_cache: dict = {"wiki_dir": None, "corpus": None, "idf": None, "mtime_sum": 0}
+
+
+def _get_mtime_sum(wiki_dir: Path) -> float:
+    """所有 .md 文件的 mtime 之和，用于判断缓存是否失效。"""
+    return sum(f.stat().st_mtime for f in wiki_dir.rglob("*.md") if f.is_file())
+
+
+def _get_cached_corpus_idf(wiki_dir: Path) -> tuple[list[dict], dict]:
+    """返回缓存的 (corpus, idf)，若 wiki 有更新则重建。"""
+    mtime_sum = _get_mtime_sum(wiki_dir)
+    if (
+        _cache["wiki_dir"] == wiki_dir
+        and _cache["corpus"] is not None
+        and _cache["mtime_sum"] == mtime_sum
+    ):
+        return _cache["corpus"], _cache["idf"]
+
+    corpus = build_corpus(wiki_dir)
+    idf = build_idf(corpus)
+    _cache.update({"wiki_dir": wiki_dir, "corpus": corpus, "idf": idf, "mtime_sum": mtime_sum})
+    return corpus, idf
+
+
 # ─── 公开 Python API ────────────────────────────────────────────────────────
 
 def search_wiki(query: str, wiki_dir: str = None, top_k: int = 5) -> list[dict]:
@@ -179,11 +205,10 @@ def search_wiki(query: str, wiki_dir: str = None, top_k: int = 5) -> list[dict]:
     if not wd.exists():
         return []
 
-    corpus = build_corpus(wd)
+    corpus, idf = _get_cached_corpus_idf(wd)
     if not corpus:
         return []
 
-    idf = build_idf(corpus)
     query_tokens = tokenize(query)
     if not query_tokens:
         return []

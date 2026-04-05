@@ -103,12 +103,13 @@ def main(topic: str, top_k: int, wiki_dir: Optional[str]):
             print(msg)
         return
 
-    # 读取条目内容
+    # 幻灯片只需高层概述，每个条目截断到 1500 字符
+    MAX_CHARS = 1500
     entries_text = []
     for r in results:
         fp = Path(r["filepath"])
         if fp.exists():
-            content = fp.read_text(encoding="utf-8", errors="ignore")
+            content = fp.read_text(encoding="utf-8", errors="ignore")[:MAX_CHARS]
             entries_text.append(f"=== {r['filename']} ===\n{content}")
 
     wiki_entries = "\n\n".join(entries_text)
@@ -122,12 +123,13 @@ def main(topic: str, top_k: int, wiki_dir: Optional[str]):
 
     # 调用 LLM
     client = LLMClient(config)
+    slides_max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("slides")
     if HAS_RICH:
         with console.status("[cyan]正在生成幻灯片...[/cyan]"):
-            slides_content = client.call(prompt)
+            slides_content = client.call(prompt, max_tokens=slides_max_tokens)
     else:
         print("正在生成幻灯片...")
-        slides_content = client.call(prompt)
+        slides_content = client.call(prompt, max_tokens=slides_max_tokens)
 
     # 确保 marp: true frontmatter 存在
     if "marp: true" not in slides_content:
