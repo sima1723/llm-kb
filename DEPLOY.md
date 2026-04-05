@@ -157,17 +157,39 @@ code config.yaml          # VS Code
 open -a TextEdit config.yaml  # macOS 文本编辑器
 ```
 
-找到文件最顶部的这一行：
+找到文件最顶部的这两行：
 
 ```yaml
-api_key: ""   # 填入你的 sk-ant-... 密钥
+api_key: ""
+base_url: ""
 ```
 
-**把双引号之间填入你的 Key：**
+---
+
+### 方式 A：使用 Anthropic 官方 API（国际版）
+
+只需填 `api_key`，`base_url` 留空：
 
 ```yaml
 api_key: "sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxx"
+base_url: ""
 ```
+
+---
+
+### 方式 B：使用中转/代理服务（推荐国内用户）
+
+支持 **AnyRouter**、**OpenRouter** 等兼容 Anthropic API 的中转服务，填入中转地址和对应 Key：
+
+```yaml
+api_key: "你的中转服务 Key"
+base_url: "https://api.anyruter.com"   # 替换为你的中转服务地址
+```
+
+> 中转服务通常在其控制台提供 `Base URL` 和 `API Key`，照填即可。  
+> 也支持通过环境变量设置：`ANTHROPIC_API_KEY` 和 `ANTHROPIC_BASE_URL`。
+
+---
 
 保存文件（nano 用 `Ctrl+O` 然后 `Enter`，再 `Ctrl+X` 退出）。
 

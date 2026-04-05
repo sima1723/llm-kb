@@ -2,7 +2,8 @@
 # API 密钥配置 — 在这里填入你的 Anthropic API Key
 # 获取方式：https://console.anthropic.com → API Keys → Create Key
 # ============================================================
-api_key: ""   # 填入你的 sk-ant-... 密钥，或留空使用环境变量 ANTHROPIC_API_KEY
+api_key: ""   # 填入你的 API Key（Anthropic 原生 sk-ant-... 或中转服务的 key）
+base_url: ""  # 留空 = 使用 Anthropic 官方 API；填中转地址如 https://api.anyruter.com
 
 llm:
   model: "claude-sonnet-4-20250514"
