@@ -40,6 +40,8 @@ make ask-save Q="什么是 Transformer?"
 | 命令 | 说明 |
 |------|------|
 | `make clip URL=<url>` | 抓取网页到 `raw/articles/` |
+| `make clip-video URL=<url>` | 提取 YouTube 字幕到 `raw/media-notes/`（需 `pip install yt-dlp`）|
+| `make clip-video URL=<url> WHISPER=1` | 字幕不可用时降级到 Whisper 转录（需 `pip install openai-whisper`）|
 | `make extract PDF=<path>` | 提取 PDF 文字到 `raw/papers/` |
 | `make note TITLE=<标题> TYPE=<类型>` | 新建手动笔记（article/paper/media-note） |
 
@@ -48,6 +50,7 @@ make ask-save Q="什么是 Transformer?"
 | 命令 | 说明 |
 |------|------|
 | `make compile` | 增量编译（只处理新文件） |
+| `make compile-commit` | 增量编译 + 编译结束后自动 `git commit wiki/` |
 | `make compile-full` | 全量重编译所有 raw 文件 |
 | `make compile-dry` | 预览待处理文件（不调用 API） |
 
@@ -55,7 +58,8 @@ make ask-save Q="什么是 Transformer?"
 
 | 命令 | 说明 |
 |------|------|
-| `make search Q=<关键词>` | 全文搜索 wiki |
+| `make search Q=<关键词>` | TF-IDF 全文搜索 wiki |
+| `make search-semantic Q=<问题>` | LLM 语义搜索（跨语言/近义词/概念级查询） |
 | `make list` | 列出所有 wiki 条目 |
 | `make show Q=<条目名>` | 显示条目内容及关联图谱 |
 | `make ask Q=<问题>` | 基于知识库回答问题 |

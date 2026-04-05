@@ -156,10 +156,14 @@ def write_wiki_entries(entries: list, wiki_dir: str) -> list:
     return written
 
 
-def git_commit(message: str):
-    """执行 git add -A 和 git commit。"""
+def git_commit(message: str, paths: list = None):
+    """
+    只暂存 wiki/ 目录变更并提交，不影响 raw/ 或工具代码。
+    paths: 要 git add 的路径列表，默认仅 ["wiki/"]
+    """
+    add_paths = paths or ["wiki/"]
     try:
-        subprocess.run(["git", "add", "-A"], check=True, capture_output=True)
+        subprocess.run(["git", "add", "--"] + add_paths, check=True, capture_output=True)
         result = subprocess.run(
             ["git", "commit", "-m", message],
             capture_output=True, text=True
@@ -262,7 +266,11 @@ def compile_single_file(
 @click.option("--dry-run", is_flag=True, help="只显示待处理文件，不实际编译")
 @click.option("--file", "single_file", default=None, help="只编译指定文件")
 @click.option("--config", "config_path", default="config.yaml", help="配置文件路径")
-def main(full, dry_run, single_file, config_path):
+@click.option("--git-commit", "do_git_commit", is_flag=True, default=None,
+              help="编译结束后自动 git commit wiki/ 变更（覆盖 config.yaml 设置）")
+@click.option("--no-git-commit", "skip_git_commit", is_flag=True, default=False,
+              help="强制禁用 git commit（覆盖 config.yaml 设置）")
+def main(full, dry_run, single_file, config_path, do_git_commit, skip_git_commit):
     """LLM 知识库编译引擎 — 将 raw/ 文件编译为 wiki/ 条目。"""
     config = load_config(config_path)
     paths = config["paths"]
@@ -270,6 +278,14 @@ def main(full, dry_run, single_file, config_path):
     wiki_dir = paths["wiki"]
     state_dir = paths["state"]
     templates_dir = paths["templates"]
+
+    # 决定是否 git commit：CLI 标志 > config.yaml > 默认关闭
+    if skip_git_commit:
+        auto_git = False
+    elif do_git_commit:
+        auto_git = True
+    else:
+        auto_git = config.get("compile", {}).get("git_auto_commit", False)
 
     state = StateManager(state_dir)
     template = load_template(templates_dir, "compile.txt")
@@ -332,8 +348,6 @@ def main(full, dry_run, single_file, config_path):
                         f"  [green]✓[/green] {filename} → "
                         f"{', '.join(entry_names) or '（无新条目）'}"
                     )
-                    # git commit 每个文件
-                    git_commit(f"compile: 处理 {filename}")
                     success += 1
                 else:
                     failed += 1
@@ -361,6 +375,16 @@ def main(full, dry_run, single_file, config_path):
         "files_failed": failed,
         "cost_usd": summary["cost_usd"],
     })
+
+    # 编译结束后统一 git commit（只暂存 wiki/ 目录）
+    if auto_git and success > 0:
+        commit_msg = (
+            f"compile: 处理 {success} 个文件，更新 wiki/\n\n"
+            f"花费：${summary['cost_usd']:.4f}  |  "
+            f"Token：{summary['input_tokens']:,} in / {summary['output_tokens']:,} out"
+        )
+        git_commit(commit_msg, paths=["wiki/"])
+        console.print("[dim]✓ git commit wiki/ 完成[/dim]")
 
 
 if __name__ == "__main__":

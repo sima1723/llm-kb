@@ -26,6 +26,7 @@ compile:
   budget_limit_usd: 5.0      # 单次 compile 费用上限
   input_price_per_mtok: 3.0  # Sonnet 输入价格
   output_price_per_mtok: 15.0 # Sonnet 输出价格
+  git_auto_commit: false     # 编译结束后自动 git commit wiki/（只暂存 wiki/ 目录）
 
 wiki:
   language: "zh"             # wiki 条目语言

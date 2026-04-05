@@ -4,9 +4,9 @@
 PYTHON := python3
 TOOLS  := tools
 
-.PHONY: help init extract clip note compile compile-full \
-        search ask ask-save slides report lint lint-fix lint-ai \
-        explore explore-add stub-fill stub-fill-dry stats status
+.PHONY: help init extract clip clip-video note compile compile-full \
+        search search-semantic ask ask-save slides report lint lint-fix lint-ai \
+        explore explore-add stub-fill stub-fill-dry stats status compile-commit
 
 ## help: 显示帮助信息
 help:
@@ -34,6 +34,12 @@ clip:
 	@if [ -z "$(URL)" ]; then echo "请指定 URL，例如: make clip URL=https://example.com"; exit 1; fi
 	$(PYTHON) $(TOOLS)/web_to_md.py "$(URL)"
 
+## clip-video: 提取 YouTube/视频字幕到 raw/media-notes/  (URL=https://...)
+## 依赖: pip install yt-dlp  |  可选: pip install openai-whisper
+clip-video:
+	@if [ -z "$(URL)" ]; then echo "请指定 URL，例如: make clip-video URL=https://youtube.com/watch?v=..."; exit 1; fi
+	$(PYTHON) $(TOOLS)/video_to_md.py "$(URL)" $(if $(LANG),--lang $(LANG),) $(if $(WHISPER),--whisper,)
+
 ## note: 新建手动笔记  (TITLE=标题  TYPE=article|paper|media-note)
 note:
 	@if [ -z "$(TITLE)" ]; then echo "请指定 TITLE，例如: make note TITLE='我的笔记'"; exit 1; fi
@@ -51,10 +57,19 @@ compile-full:
 compile-dry:
 	$(PYTHON) $(TOOLS)/compile_wiki.py --dry-run
 
-## search: 全文搜索  (Q=关键词)
+## compile-commit: 增量编译 + 编译结束后自动 git commit wiki/
+compile-commit:
+	$(PYTHON) $(TOOLS)/compile_wiki.py --git-commit
+
+## search: 全文搜索（TF-IDF）  (Q=关键词)
 search:
 	@if [ -z "$(Q)" ]; then echo "请指定 Q，例如: make search Q='Transformer'"; exit 1; fi
 	$(PYTHON) $(TOOLS)/search.py query "$(Q)"
+
+## search-semantic: 语义搜索（LLM理解查询意图）  (Q=问题或概念)
+search-semantic:
+	@if [ -z "$(Q)" ]; then echo "请指定 Q，例如: make search-semantic Q='Self-Attention'"; exit 1; fi
+	$(PYTHON) $(TOOLS)/search.py semantic "$(Q)"
 
 ## list: 列出所有 wiki 条目
 list:

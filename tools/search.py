@@ -401,5 +401,137 @@ def related(entry_name: str, wiki_dir: Optional[str]):
                 print(f"   [[{bl}]]")
 
 
+@cli.command()
+@click.argument("query_text")
+@click.option("--top", default=8, show_default=True, help="返回结果数量上限")
+@click.option("--wiki-dir", default=None, help="wiki 目录路径")
+@click.option("--config", "config_path", default="config.yaml", help="配置文件路径")
+def semantic(query_text: str, top: int, wiki_dir: Optional[str], config_path: str):
+    """
+    语义搜索 — 用 LLM 理解查询意图，从知识库中找出最相关的条目。
+
+    适合 TF-IDF 关键词搜索找不到的情况：跨语言（Self-Attention→自注意力）、
+    近义词、概念级查询（"LLM 如何学习"）等。
+    """
+    import yaml
+
+    wd = Path(wiki_dir) if wiki_dir else WIKI_DIR
+    if not wd.exists():
+        _msg = "wiki/ 目录不存在，请先运行 make compile"
+        print(_msg)
+        return
+
+    corpus = build_corpus(wd)
+    if not corpus:
+        print("wiki/ 目录为空，请先运行 make compile")
+        return
+
+    # 构建紧凑的知识库摘要（每条目：标题 + 前200字正文）
+    summary_lines = []
+    for doc in corpus:
+        body_preview = doc["body_text"].strip()[:200].replace("\n", " ")
+        summary_lines.append(f"[[{doc['title']}]] ({doc['filename']})\n  {body_preview}")
+    corpus_summary = "\n\n".join(summary_lines)
+
+    # 读取 config，加载 LLMClient
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+    except Exception:
+        config = {}
+
+    try:
+        from tools.llm_client import LLMClient
+    except ImportError:
+        sys.path.insert(0, str(_HERE))
+        from tools.llm_client import LLMClient
+
+    language = config.get("wiki", {}).get("language", "zh")
+
+    prompt = f"""\
+你是一位知识库检索助手。语言：{language}
+
+用户查询："{query_text}"
+
+以下是知识库中所有条目的标题和摘要：
+
+<knowledge_base>
+{corpus_summary}
+</knowledge_base>
+
+## 任务
+从上面的条目中，找出与用户查询**语义最相关**的条目（最多 {top} 个）。
+相关性判断应基于概念语义，而非字面关键词匹配。
+例如："Self-Attention"与"自注意力"是同一概念；"scaling law"与"规模定律"相关。
+
+## 输出格式（严格按此格式，每行一条）
+RESULT: [[条目名]] | 相关性说明（一句话）
+
+最后一行输出：
+SUMMARY: （一句话总结：用户在问什么，知识库中有哪些相关内容）
+"""
+
+    if HAS_RICH:
+        console.print(f"\n[bold cyan]语义搜索: {query_text}[/bold cyan]")
+        console.print("[dim]正在调用 LLM 分析语义相关性...[/dim]")
+    else:
+        print(f"\n语义搜索: {query_text}")
+        print("正在调用 LLM...")
+
+    try:
+        client = LLMClient(config)
+        response = client.chat(prompt)
+    except Exception as e:
+        _err = f"LLM 调用失败：{e}"
+        if HAS_RICH:
+            console.print(f"[red]{_err}[/red]")
+        else:
+            print(_err)
+        return
+
+    # 解析结果
+    result_lines = []
+    summary_line = ""
+    for line in response.splitlines():
+        line = line.strip()
+        if line.startswith("RESULT:"):
+            result_lines.append(line[len("RESULT:"):].strip())
+        elif line.startswith("SUMMARY:"):
+            summary_line = line[len("SUMMARY:"):].strip()
+
+    if HAS_RICH:
+        if result_lines:
+            console.print(f"\n找到 {len(result_lines)} 条语义相关结果：\n")
+            for i, r in enumerate(result_lines, 1):
+                # 尝试提取条目名，检查文件是否存在
+                m = re.match(r'\[\[(.+?)\]\](.*)', r)
+                if m:
+                    entry_name = m.group(1)
+                    explanation = m.group(2).strip().lstrip("|").strip()
+                    exists = (wd / f"{entry_name}.md").exists()
+                    status = "[green]✓[/green]" if exists else "[yellow]~[/yellow]"
+                    console.print(
+                        f"  {i}. {status} [bold cyan][[{entry_name}]][/bold cyan]"
+                        + (f"  [dim]{explanation}[/dim]" if explanation else "")
+                    )
+                else:
+                    console.print(f"  {i}. {r}")
+        else:
+            console.print("[yellow]LLM 未返回结构化结果，原始响应：[/yellow]")
+            console.print(response[:500])
+
+        if summary_line:
+            console.print(f"\n[dim]摘要：{summary_line}[/dim]")
+    else:
+        if result_lines:
+            print(f"\n找到 {len(result_lines)} 条语义相关结果：")
+            for i, r in enumerate(result_lines, 1):
+                print(f"  {i}. {r}")
+        else:
+            print(response[:500])
+        if summary_line:
+            print(f"\n摘要：{summary_line}")
+
+
 if __name__ == "__main__":
     cli()
