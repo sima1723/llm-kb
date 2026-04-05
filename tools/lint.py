@@ -226,26 +226,34 @@ def check_empty_entries(entries: list[dict], min_length: int = 100) -> list[Issu
 
 
 def check_duplicates(entries: list[dict], threshold: float = 0.80) -> list[Issue]:
-    """重复条目：文件名相似度 > threshold"""
+    """重复条目：文件名相似度 > threshold。用首字符前缀分组减少比较量。"""
+    from collections import defaultdict
     issues = []
     main_entries = [e for e in entries
                     if "answers" not in str(e["rel"]) and "slides" not in str(e["rel"])]
+
+    # 按首字符分组（相似文件名通常首字符相同），避免 O(n²) 全量比较
+    groups: dict[str, list] = defaultdict(list)
+    for e in main_entries:
+        groups[e["stem"][0].lower() if e["stem"] else ""].append(e)
+
     seen_pairs: set[tuple] = set()
-    for i, e1 in enumerate(main_entries):
-        for e2 in main_entries[i + 1:]:
-            pair = tuple(sorted([e1["stem"], e2["stem"]]))
-            if pair in seen_pairs:
-                continue
-            ratio = SequenceMatcher(None, e1["stem"], e2["stem"]).ratio()
-            if ratio >= threshold:
-                seen_pairs.add(pair)
-                issues.append(Issue(
-                    "duplicate",
-                    e1["filename"],
-                    f"与 {e2['filename']} 文件名相似度 {ratio:.0%}",
-                    auto_fixable=False,
-                    ai_fixable=True,
-                ))
+    for group in groups.values():
+        for i, e1 in enumerate(group):
+            for e2 in group[i + 1:]:
+                pair = tuple(sorted([e1["stem"], e2["stem"]]))
+                if pair in seen_pairs:
+                    continue
+                ratio = SequenceMatcher(None, e1["stem"], e2["stem"]).ratio()
+                if ratio >= threshold:
+                    seen_pairs.add(pair)
+                    issues.append(Issue(
+                        "duplicate",
+                        e1["filename"],
+                        f"与 {e2['filename']} 文件名相似度 {ratio:.0%}",
+                        auto_fixable=False,
+                        ai_fixable=True,
+                    ))
     return issues
 
 
@@ -291,7 +299,10 @@ def fix_broken_link(issue: Issue, wiki_dir: Path, dry_run: bool) -> bool:
 
 def fix_missing_frontmatter(issue: Issue, wiki_dir: Path, dry_run: bool) -> bool:
     """补充缺失的 frontmatter 字段"""
-    fp = wiki_dir / issue.filepath
+    fp = (wiki_dir / issue.filepath).resolve()
+    # 防止路径穿越：确保目标文件仍在 wiki_dir 内
+    if not str(fp).startswith(str(wiki_dir.resolve())):
+        return False
     if not fp.exists():
         return False
     raw = fp.read_text(encoding="utf-8", errors="ignore")
@@ -387,12 +398,12 @@ def apply_ai_fixes(issues: list[Issue], wiki_dir: Path, config: dict, dry_run: b
         )
 
     language = config.get("wiki", {}).get("language", "zh")
+    lint_max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("lint_ai")
 
     # 按文件分组
     file_issues: dict[str, list[Issue]] = {}
     for iss in ai_issues:
-        fp = iss.filepath
-        file_issues.setdefault(fp, []).append(iss)
+        file_issues.setdefault(iss.filepath, []).append(iss)
 
     try:
         from tools.llm_client import LLMClient
@@ -402,42 +413,55 @@ def apply_ai_fixes(issues: list[Issue], wiki_dir: Path, config: dict, dry_run: b
         print(f"初始化 LLM 失败: {e}")
         return
 
+    if dry_run:
+        for filepath in file_issues:
+            print(f"  [dry-run] 将调用 AI 修复: {filepath}")
+        return
+
+    # 将所有文件的问题合并到一次 LLM 调用，减少 API 请求次数
+    all_issues_desc_parts = []
+    all_entries_parts = []
+    valid_file_issues: dict[str, list[Issue]] = {}
+
+    MAX_ENTRY_CHARS = 3000  # 每个条目截断上限
     for filepath, file_issue_list in file_issues.items():
         abs_path = wiki_dir / filepath
         if not abs_path.exists():
             continue
-
-        entry_content = abs_path.read_text(encoding="utf-8", errors="ignore")
+        entry_content = abs_path.read_text(encoding="utf-8", errors="ignore")[:MAX_ENTRY_CHARS]
         issues_desc = "\n".join(f"- [{iss.type_name}] {iss.detail}" for iss in file_issue_list)
+        all_issues_desc_parts.append(f"[{filepath}]\n{issues_desc}")
+        all_entries_parts.append(f"=== {filepath} ===\n{entry_content}")
+        valid_file_issues[filepath] = file_issue_list
 
-        prompt = template.format(
-            language=language,
-            issues=issues_desc,
-            entries=f"=== {filepath} ===\n{entry_content}",
-        )
+    if not valid_file_issues:
+        return
 
-        if dry_run:
-            print(f"  [dry-run] 将调用 AI 修复: {filepath}")
-            continue
+    batch_issues = "\n\n".join(all_issues_desc_parts)
+    batch_entries = "\n\n".join(all_entries_parts)
+    prompt = template.format(language=language, issues=batch_issues, entries=batch_entries)
 
-        try:
-            response = client.call(prompt)
-            entries = parse_wiki_entries(response)
-            for entry in entries:
-                out_path = wiki_dir / entry["filename"]
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                out_path.write_text(entry["content"], encoding="utf-8")
-                for iss in file_issue_list:
-                    iss.status = "已修复"
-                if HAS_RICH:
-                    console.print(f"  [green]AI 修复: {entry['filename']}[/green]")
-                else:
-                    print(f"  AI 修复: {entry['filename']}")
-        except Exception as e:
+    try:
+        response = client.call(prompt, max_tokens=lint_max_tokens)
+        entries = parse_wiki_entries(response)
+        for entry in entries:
+            out_path = wiki_dir / entry["filename"]
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(entry["content"], encoding="utf-8")
+            # 标记对应文件的所有问题为已修复
+            for fp_issues in valid_file_issues.values():
+                for iss in fp_issues:
+                    if iss.filepath == entry["filename"] or entry["filename"].endswith(iss.filepath):
+                        iss.status = "已修复"
             if HAS_RICH:
-                console.print(f"  [red]AI 修复失败 {filepath}: {e}[/red]")
+                console.print(f"  [green]AI 修复: {entry['filename']}[/green]")
             else:
-                print(f"  AI 修复失败 {filepath}: {e}")
+                print(f"  AI 修复: {entry['filename']}")
+    except Exception as e:
+        if HAS_RICH:
+            console.print(f"  [red]AI 修复失败: {e}[/red]")
+        else:
+            print(f"  AI 修复失败: {e}")
 
     summary = client.get_cost_summary()
     if HAS_RICH:

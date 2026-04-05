@@ -79,13 +79,16 @@ def build_context(question: str, wiki_dir: Path, deep: bool = False, top_k: int 
     if not results:
         return "", []
 
+    # 每个条目最多发送 2000 字符，足够 LLM 理解内容，避免长文档浪费 token
+    MAX_CHARS = 2000
+
     loaded_files: dict[str, str] = {}  # filename -> content
 
     # 加载直接搜索结果
     for r in results:
         fp = Path(r["filepath"])
         if fp.exists():
-            loaded_files[r["filename"]] = _read_entry(fp)
+            loaded_files[r["filename"]] = _read_entry(fp)[:MAX_CHARS]
 
     # deep 模式：递归一层链接
     if deep:
@@ -96,15 +99,12 @@ def build_context(question: str, wiki_dir: Path, deep: bool = False, top_k: int 
                 lk_path = wiki_dir / f"{lk}.md"
                 lk_rel = f"{lk}.md"
                 if lk_rel not in loaded_files and lk_rel not in extra and lk_path.exists():
-                    extra[lk_rel] = _read_entry(lk_path)
+                    extra[lk_rel] = _read_entry(lk_path)[:MAX_CHARS]
         loaded_files.update(extra)
 
-    # 拼接上下文
-    parts = []
-    for fname, content in loaded_files.items():
-        parts.append(f"=== {fname} ===\n{content}")
-
-    context_text = "\n\n".join(parts)
+    context_text = "\n\n".join(
+        f"=== {fname} ===\n{content}" for fname, content in loaded_files.items()
+    )
     return context_text, list(loaded_files.keys())
 
 
@@ -159,12 +159,13 @@ def main(question: str, save: bool, deep: bool, wiki_dir: Optional[str]):
         print(f"初始化 LLM 客户端失败: {e}")
         sys.exit(1)
 
+    ask_max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("ask")
     if HAS_RICH:
         with console.status("[cyan]正在生成答案...[/cyan]"):
-            answer = client.call(prompt)
+            answer = client.call(prompt, max_tokens=ask_max_tokens)
     else:
         print("正在生成答案...")
-        answer = client.call(prompt)
+        answer = client.call(prompt, max_tokens=ask_max_tokens)
 
     # 4. 打印答案
     if HAS_RICH:

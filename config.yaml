@@ -1,8 +1,18 @@
 llm:
   model: "claude-sonnet-4-20250514"
-  max_tokens: 8192
+  max_tokens: 4096          # 默认上限（compile 场景覆盖为 8192）
   retry_count: 3
-  retry_delay_base: 2  # 指数退避基数（秒）
+  retry_delay_base: 2       # 指数退避基数（秒）
+  # 按工具覆盖 max_tokens，避免简单任务浪费输出 token 预算
+  max_tokens_by_tool:
+    compile: 8192           # 需要完整 wiki 条目输出
+    merge: 4096
+    ask: 4096
+    slides: 3000
+    report_md: 4096
+    report_brief: 1000
+    explore: 2000
+    lint_ai: 2000
 
 compile:
   max_file_size_kb: 50       # 超过此大小分段处理

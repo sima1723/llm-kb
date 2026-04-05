@@ -53,69 +53,67 @@ def count_raw_files() -> dict:
     return result
 
 
-def count_wiki_entries() -> dict:
-    """统计 wiki 条目数及平均字数"""
+def gather_wiki_stats() -> dict:
+    """
+    单趟扫描 wiki/，同时统计条目数、字数、链接数、断链、孤立条目。
+    替代原来的 count_wiki_entries() + count_links() 两次独立扫描。
+    """
     if not WIKI_DIR.exists():
-        return {"total": 0, "answers": 0, "slides": 0, "avg_words": 0}
+        return {
+            "total": 0, "answers": 0, "slides": 0, "avg_words": 0,
+            "total_links": 0, "broken": 0, "orphans": 0, "avg_links": 0,
+        }
 
-    main_entries = []
-    answers = []
-    slides = []
+    main_words: list[int] = []
+    answers_count = 0
+    slides_count = 0
+    stems: set[str] = set()
+    entries_links: list[tuple[str, list[str]]] = []  # (stem, [link, ...])
 
     for md_file in WIKI_DIR.rglob("*.md"):
         if md_file.name == "INDEX.md":
             continue
+        rel_str = str(md_file.relative_to(WIKI_DIR))
         content = md_file.read_text(encoding="utf-8", errors="ignore")
-        word_count = len(content.replace(' ', '').replace('\n', ''))
-        rel = md_file.relative_to(WIKI_DIR)
-        if "answers" in str(rel):
-            answers.append(word_count)
-        elif "slides" in str(rel):
-            slides.append(word_count)
+
+        if "answers" in rel_str:
+            answers_count += 1
+        elif "slides" in rel_str:
+            slides_count += 1
         else:
-            main_entries.append(word_count)
+            main_words.append(len(content.replace(' ', '').replace('\n', '')))
+            stems.add(md_file.stem)
+            links = re.findall(r'\[\[(.+?)\]\]', content)
+            entries_links.append((md_file.stem, links))
 
-    avg = int(sum(main_entries) / len(main_entries)) if main_entries else 0
+    total_links = sum(len(lks) for _, lks in entries_links)
+    broken = sum(1 for _, lks in entries_links for lk in lks if lk not in stems)
+    all_targets = {lk for _, lks in entries_links for lk in lks}
+    orphans = sum(1 for stem, _ in entries_links if stem not in all_targets)
+    avg_words = int(sum(main_words) / len(main_words)) if main_words else 0
+    avg_links = round(total_links / len(entries_links), 1) if entries_links else 0
+
     return {
-        "total": len(main_entries),
-        "answers": len(answers),
-        "slides": len(slides),
-        "avg_words": avg,
-    }
-
-
-def count_links() -> dict:
-    """统计内部链接总数、断链数、孤立条目数"""
-    if not WIKI_DIR.exists():
-        return {"total_links": 0, "broken": 0, "orphans": 0, "avg_links": 0}
-
-    all_entries = []
-    stems = set()
-
-    for md_file in WIKI_DIR.rglob("*.md"):
-        if md_file.name == "INDEX.md":
-            continue
-        if "answers" in str(md_file) or "slides" in str(md_file):
-            continue
-        stems.add(md_file.stem)
-        content = md_file.read_text(encoding="utf-8", errors="ignore")
-        links = re.findall(r'\[\[(.+?)\]\]', content)
-        all_entries.append({"stem": md_file.stem, "links": links})
-
-    total_links = sum(len(e["links"]) for e in all_entries)
-    broken = sum(1 for e in all_entries for lk in e["links"] if lk not in stems)
-
-    # 孤立条目：没有任何条目链接到它
-    all_link_targets = set(lk for e in all_entries for lk in e["links"])
-    orphans = sum(1 for e in all_entries if e["stem"] not in all_link_targets)
-
-    avg = round(total_links / len(all_entries), 1) if all_entries else 0
-    return {
+        "total": len(main_words),
+        "answers": answers_count,
+        "slides": slides_count,
+        "avg_words": avg_words,
         "total_links": total_links,
         "broken": broken,
         "orphans": orphans,
-        "avg_links": avg,
+        "avg_links": avg_links,
     }
+
+
+# 保留向后兼容的薄包装，内部复用 gather_wiki_stats
+def count_wiki_entries() -> dict:
+    s = gather_wiki_stats()
+    return {k: s[k] for k in ("total", "answers", "slides", "avg_words")}
+
+
+def count_links() -> dict:
+    s = gather_wiki_stats()
+    return {k: s[k] for k in ("total_links", "broken", "orphans", "avg_links")}
 
 
 def count_pending_raw() -> int:
@@ -154,20 +152,19 @@ def get_api_cost() -> float:
 def print_dashboard():
     """输出统计仪表盘"""
     raw = count_raw_files()
-    wiki = count_wiki_entries()
-    links = count_links()
+    s = gather_wiki_stats()   # 单趟扫描获取所有 wiki 统计
     pending = count_pending_raw()
     cost = get_api_cost()
 
     if HAS_RICH:
         lines = [
             f"[bold]Raw 文件:[/bold]    {raw['total']:>4}  (articles: {raw['articles']}, papers: {raw['papers']}, repos: {raw['repos']}, notes: {raw['media_notes']})",
-            f"[bold]Wiki 条目:[/bold]   {wiki['total']:>4}  (avg {wiki['avg_words']} 字/篇)",
-            f"[bold]答案记录:[/bold]    {wiki['answers']:>4}",
-            f"[bold]幻灯片:[/bold]      {wiki['slides']:>4}",
-            f"[bold]内部链接:[/bold]    {links['total_links']:>4}  (avg {links['avg_links']}/篇)",
-            f"[bold]断链:[/bold]        {links['broken']:>4}  {'[red]⚠[/red]' if links['broken'] > 0 else '[green]✓[/green]'}",
-            f"[bold]孤立条目:[/bold]    {links['orphans']:>4}  {'[yellow]⚠[/yellow]' if links['orphans'] > 0 else '[green]✓[/green]'}",
+            f"[bold]Wiki 条目:[/bold]   {s['total']:>4}  (avg {s['avg_words']} 字/篇)",
+            f"[bold]答案记录:[/bold]    {s['answers']:>4}",
+            f"[bold]幻灯片:[/bold]      {s['slides']:>4}",
+            f"[bold]内部链接:[/bold]    {s['total_links']:>4}  (avg {s['avg_links']}/篇)",
+            f"[bold]断链:[/bold]        {s['broken']:>4}  {'[red]⚠[/red]' if s['broken'] > 0 else '[green]✓[/green]'}",
+            f"[bold]孤立条目:[/bold]    {s['orphans']:>4}  {'[yellow]⚠[/yellow]' if s['orphans'] > 0 else '[green]✓[/green]'}",
             f"[bold]待处理:[/bold]      {pending:>4}  个 raw 文件",
             f"[bold]累计API费用:[/bold] ${cost:.4f}",
         ]
@@ -182,12 +179,12 @@ def print_dashboard():
         print("  知识库统计")
         print("─" * 40)
         print(f"  Raw 文件:    {raw['total']:>4}  (articles:{raw['articles']} papers:{raw['papers']} repos:{raw['repos']} notes:{raw['media_notes']})")
-        print(f"  Wiki 条目:   {wiki['total']:>4}  (avg {wiki['avg_words']} 字/篇)")
-        print(f"  答案记录:    {wiki['answers']:>4}")
-        print(f"  幻灯片:      {wiki['slides']:>4}")
-        print(f"  内部链接:    {links['total_links']:>4}  (avg {links['avg_links']}/篇)")
-        print(f"  断链:        {links['broken']:>4}")
-        print(f"  孤立条目:    {links['orphans']:>4}")
+        print(f"  Wiki 条目:   {s['total']:>4}  (avg {s['avg_words']} 字/篇)")
+        print(f"  答案记录:    {s['answers']:>4}")
+        print(f"  幻灯片:      {s['slides']:>4}")
+        print(f"  内部链接:    {s['total_links']:>4}  (avg {s['avg_links']}/篇)")
+        print(f"  断链:        {s['broken']:>4}")
+        print(f"  孤立条目:    {s['orphans']:>4}")
         print(f"  待处理:      {pending:>4}  个 raw 文件")
         print(f"  累计API费用: ${cost:.4f}")
         print("─" * 40 + "\n")
