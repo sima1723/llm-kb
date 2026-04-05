@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM 知识库</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- 顶部导航栏 -->
+  <header id="topbar">
+    <span id="logo">LLM <span>知识库</span></span>
+
+    <div id="search-wrap">
+      <svg id="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.656a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z"/>
+      </svg>
+      <input id="search-input" type="text" placeholder="搜索条目 / 直接提问..." autocomplete="off" spellcheck="false">
+      <span id="search-mode-badge">TF-IDF</span>
+    </div>
+
+    <button class="topbar-btn primary" id="btn-add">+ 添加内容</button>
+    <button class="topbar-btn" id="btn-settings">设置</button>
+  </header>
+
+  <!-- 主区域：图谱 + 侧边栏 -->
+  <div id="main">
+    <div id="graph-container">
+      <svg id="graph-canvas"></svg>
+      <!-- 空状态提示 -->
+      <div id="empty-hint" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; pointer-events:none;">
+        <div style="font-size:48px; margin-bottom:16px; opacity:0.2;">🧠</div>
+        <div style="color: var(--text2); font-size:14px;">知识库还是空的</div>
+        <div style="color: var(--text2); font-size:12px; margin-top:6px;">点击「+ 添加内容」开始摄入资料</div>
+      </div>
+    </div>
+
+    <div id="sidebar" class="collapsed">
+      <div id="sidebar-header">
+        <span id="sidebar-title">条目</span>
+        <button id="sidebar-close">✕</button>
+      </div>
+      <div id="sidebar-body">
+        <!-- 动态注入 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 状态栏 -->
+  <div id="statusbar">
+    <span id="stat-entries">—</span>
+    <span id="stat-answers">—</span>
+    <span id="stat-pending">—</span>
+    <span id="stat-compile">—</span>
+    <span id="stat-cost">—</span>
+    <span id="compile-indicator" style="display:none">
+      <span class="spinner"></span>&nbsp;编译中…
+    </span>
+  </div>
+</div>
+
+<!-- 添加内容抽屉 -->
+<div id="ingest-drawer">
+  <header>
+    <span>添加内容</span>
+    <button id="ingest-close" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;">✕</button>
+  </header>
+  <div id="ingest-drawer-body">
+    <div class="tabs">
+      <div class="tab active" data-tab="url">粘贴 URL</div>
+      <div class="tab" data-tab="pdf">上传 PDF</div>
+    </div>
+
+    <!-- URL 面板 -->
+    <div id="tab-url">
+      <textarea class="url-input" id="url-input" placeholder="粘贴一个或多个 URL（每行一个）&#10;&#10;例如：https://example.com/article"></textarea>
+      <button class="topbar-btn primary" id="btn-clip" style="margin-top:10px; width:100%">抓取并编译</button>
+      <div id="clip-result" style="margin-top:10px; font-size:12px; color:var(--green); display:none;"></div>
+    </div>
+
+    <!-- PDF 面板 -->
+    <div id="tab-pdf" style="display:none">
+      <div id="drop-zone">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+        </svg>
+        <span>拖拽 PDF 到此处，或点击选择</span>
+        <input type="file" id="pdf-input" accept=".pdf" multiple style="display:none">
+      </div>
+      <div id="pdf-result" style="margin-top:10px; font-size:12px; color:var(--green); display:none;"></div>
+    </div>
+
+    <!-- 编译进度 -->
+    <div id="compile-log-box" class="compile-progress" style="display:none"></div>
+  </div>
+</div>
+
+<!-- 设置抽屉 -->
+<div id="settings-drawer">
+  <header>
+    <span>设置</span>
+    <button id="settings-close" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;">✕</button>
+  </header>
+  <div id="settings-body">
+    <div class="settings-section">
+      <h3>API 配置</h3>
+      <div class="field-group">
+        <label>Anthropic API Key</label>
+        <input type="password" id="s-api-key" placeholder="sk-ant-...">
+      </div>
+      <div class="field-group">
+        <label>Base URL（中转服务，留空用官方）</label>
+        <input type="text" id="s-base-url" placeholder="https://api.example.com">
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>编译设置</h3>
+      <div class="field-group">
+        <label>单次预算上限 (USD)</label>
+        <input type="number" id="s-budget" step="0.5" min="0.5">
+      </div>
+      <div class="field-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="s-git-commit" style="width:auto">
+        <label for="s-git-commit" style="margin:0;cursor:pointer">编译后自动 git commit wiki/</label>
+      </div>
+    </div>
+    <button class="topbar-btn primary" id="btn-save-settings" style="width:100%">保存</button>
+    <div id="settings-msg" style="margin-top:8px;font-size:12px;min-height:16px;"></div>
+  </div>
+</div>
+
+<!-- 首次配置覆盖层 -->
+<div id="setup-overlay" style="display:none">
+  <div id="setup-card">
+    <h2>欢迎使用 LLM 知识库</h2>
+    <p>在开始之前，请输入你的 Anthropic API Key。<br>
+       密钥仅保存在本地 config.yaml 文件中。</p>
+    <div class="field-group">
+      <label>Anthropic API Key</label>
+      <input type="password" id="setup-api-key" placeholder="sk-ant-...">
+    </div>
+    <div class="field-group">
+      <label>Base URL（可选，中转服务）</label>
+      <input type="text" id="setup-base-url" placeholder="留空使用官方 API">
+    </div>
+    <button class="topbar-btn primary" id="btn-test-key" style="width:100%">测试连接</button>
+    <div id="test-result"></div>
+  </div>
+</div>
+
+<!-- 图谱 tooltip -->
+<div id="graph-tooltip">
+  <div class="tip-name"></div>
+  <div class="tip-desc"></div>
+</div>
+
+<!-- 点击抽屉外关闭 -->
+<div id="backdrop"></div>
+
+<!-- CDN 依赖 -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@11/marked.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

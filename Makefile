@@ -6,7 +6,8 @@ TOOLS  := tools
 
 .PHONY: help init extract clip clip-video note compile compile-full \
         search search-semantic ask ask-save slides report lint lint-fix lint-ai \
-        explore explore-add stub-fill stub-fill-dry stats status compile-commit
+        explore explore-add stub-fill stub-fill-dry stats status compile-commit \
+        web web-install
 
 ## help: 显示帮助信息
 help:
@@ -153,3 +154,11 @@ import sys; sys.path.insert(0, '.'); \
 from tools.stats import count_raw_files, count_wiki_entries, count_pending_raw; \
 r = count_raw_files(); w = count_wiki_entries(); p = count_pending_raw(); \
 print(f'待处理: {p} 个 raw 文件  |  Wiki 条目: {w[\"total\"]} 篇  |  答案: {w[\"answers\"]} 条')"
+
+## web-install: 安装 Web 服务依赖
+web-install:
+	pip install -r web/requirements.txt
+
+## web: 启动 Web 知识库界面  (PORT=8000 可选)
+web:
+	uvicorn web.app:app --reload --port $(or $(PORT),8000)
