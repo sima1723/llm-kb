@@ -49,8 +49,8 @@ class LLMClient:
         self.input_price = compile_cfg.get("input_price_per_mtok", 3.0)   # per 1M tokens
         self.output_price = compile_cfg.get("output_price_per_mtok", 15.0)
 
-        # 认证：优先使用 ANTHROPIC_API_KEY，其次尝试 Claude Code 的 OAuth Bearer token
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        # 认证优先级：config.yaml api_key > 环境变量 ANTHROPIC_API_KEY > Claude Code OAuth token
+        api_key = config.get("api_key", "").strip() or os.environ.get("ANTHROPIC_API_KEY", "")
         if api_key:
             self.client = self._anthropic.Anthropic(api_key=api_key)
         else:

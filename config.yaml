@@ -1,3 +1,9 @@
+# ============================================================
+# API 密钥配置 — 在这里填入你的 Anthropic API Key
+# 获取方式：https://console.anthropic.com → API Keys → Create Key
+# ============================================================
+api_key: ""   # 填入你的 sk-ant-... 密钥，或留空使用环境变量 ANTHROPIC_API_KEY
+
 llm:
   model: "claude-sonnet-4-20250514"
   max_tokens: 4096          # 默认上限（compile 场景覆盖为 8192）
