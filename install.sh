@@ -166,6 +166,14 @@ install_deps() {
   fi
   success "Python: $($PYTHON --version)"
 
+  # ── venv（Debian/Ubuntu 需要单独安装）──────────────────────
+  if [[ "$OS" == "debian" ]] && ! $PYTHON -m venv --help &>/dev/null 2>&1; then
+    info "安装 python3-venv..."
+    PYVER=$($PYTHON -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    sudo apt-get install -y "python${PYVER}-venv" 2>/dev/null || \
+    sudo apt-get install -y python3-venv
+  fi
+
   # ── pip ─────────────────────────────────────────────────────
   if ! $PYTHON -m pip --version &>/dev/null; then
     case "$OS" in
