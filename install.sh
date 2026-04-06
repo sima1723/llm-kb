@@ -201,25 +201,45 @@ install_deps() {
 # ══════════════════════════════════════════════════════════════
 # 阶段 2：安装 Python 依赖
 # ══════════════════════════════════════════════════════════════
+USE_VENV=0   # 全局标记，供后续 start_web / test_api 使用
+
 install_python_deps() {
   title "🐍 安装 Python 依赖"
 
-  # 创建虚拟环境
-  if [[ ! -d ".venv" ]]; then
-    info "创建虚拟环境 .venv ..."
-    $PYTHON -m venv .venv
+  # ── 询问是否使用虚拟环境 ─────────────────────────────────────
+  echo -e "  ${BOLD}是否创建虚拟环境 (.venv)？${NC}"
+  echo -e "  ${CYAN}Y${NC} 推荐用于本地开发机（多项目隔离）"
+  echo -e "  ${CYAN}N${NC} 适合专用服务器/容器（系统 Python 直接安装，更简单）"
+  read -rp "  创建虚拟环境？[Y/n]: " use_venv_ans
+
+  if [[ "${use_venv_ans,,}" == "n" ]]; then
+    USE_VENV=0
+    # Ubuntu 24.04+ / Debian 12+ PEP 668 保护，需要加 --break-system-packages
+    PIP_FLAGS=""
+    if $PYTHON -m pip install --dry-run pip 2>&1 | grep -q "externally-managed"; then
+      PIP_FLAGS="--break-system-packages"
+    fi
+    PIP_CMD="$PYTHON -m pip install -q $PIP_FLAGS"
+    success "使用系统 Python（$($PYTHON --version)）"
+  else
+    USE_VENV=1
+    if [[ ! -d ".venv" ]]; then
+      info "创建虚拟环境 .venv ..."
+      $PYTHON -m venv .venv
+    fi
+    source .venv/bin/activate
+    PYTHON=".venv/bin/python3"
+    PIP_CMD="pip install -q"
+    success "虚拟环境已激活"
   fi
-  source .venv/bin/activate
-  PYTHON=".venv/bin/python3"
-  success "虚拟环境已激活"
 
   info "安装核心依赖..."
-  pip install -q --upgrade pip
-  pip install -q -r requirements.txt
+  $PIP_CMD --upgrade pip
+  $PIP_CMD -r requirements.txt
   success "核心依赖安装完成"
 
   info "安装 Web 服务依赖..."
-  pip install -q -r web/requirements.txt
+  $PIP_CMD -r web/requirements.txt
   success "Web 依赖安装完成"
 
   # 可选依赖
@@ -228,13 +248,16 @@ install_python_deps() {
 
   read -rp "  安装 PDF 支持？(PyMuPDF) [Y/n]: " install_pdf
   if [[ "${install_pdf,,}" != "n" ]]; then
-    pip install -q pymupdf && success "PDF 支持已安装" || warn "PDF 安装失败（可跳过）"
+    $PIP_CMD pymupdf && success "PDF 支持已安装" || warn "PDF 安装失败（可跳过）"
   fi
 
   read -rp "  安装 YouTube 字幕提取？(yt-dlp) [Y/n]: " install_ytdlp
   if [[ "${install_ytdlp,,}" != "n" ]]; then
-    pip install -q yt-dlp && success "yt-dlp 已安装" || warn "yt-dlp 安装失败（可跳过）"
+    $PIP_CMD yt-dlp && success "yt-dlp 已安装" || warn "yt-dlp 安装失败（可跳过）"
   fi
+
+  # 记录选择，供 start_web 使用
+  echo "$USE_VENV" > .install_venv
 }
 
 # ══════════════════════════════════════════════════════════════
@@ -402,7 +425,7 @@ test_api() {
   title "🔌 测试 API 连通性"
   info "发送测试请求（约 3-10 秒）..."
 
-  if .venv/bin/python3 -c "
+  if $PYTHON -c "
 import sys; sys.path.insert(0, '.')
 import yaml
 cfg = yaml.safe_load(open('config.yaml').read())
@@ -436,9 +459,12 @@ start_web() {
     PORT=$((PORT + 1))
   fi
 
-  # 激活虚拟环境
-  if [[ -f ".venv/bin/activate" ]]; then
+  # 按安装时的选择决定用哪个 Python / uvicorn
+  if [[ -f ".install_venv" && "$(cat .install_venv)" == "1" ]]; then
     source .venv/bin/activate
+    UVICORN=".venv/bin/uvicorn"
+  else
+    UVICORN="$(command -v uvicorn || echo "$PYTHON -m uvicorn")"
   fi
 
   echo ""
@@ -460,7 +486,7 @@ start_web() {
   ) &
 
   # 启动服务（前台）
-  exec .venv/bin/uvicorn web.app:app --host 0.0.0.0 --port "$PORT"
+  exec $UVICORN web.app:app --host 0.0.0.0 --port "$PORT"
 }
 
 # ══════════════════════════════════════════════════════════════
@@ -491,9 +517,9 @@ main() {
       echo -e "\n  重新启动：${CYAN}bash install.sh --start${NC}"
       ;;
     start)
-      # 仅启动
-      if [[ ! -f ".venv/bin/uvicorn" ]]; then
-        error "未找到虚拟环境，请先运行：bash install.sh"
+      # 仅启动（支持 venv 和系统 Python 两种模式）
+      if [[ ! -f ".venv/bin/uvicorn" ]] && ! command -v uvicorn &>/dev/null; then
+        error "未找到 uvicorn，请先运行：bash install.sh"
         exit 1
       fi
       start_web
