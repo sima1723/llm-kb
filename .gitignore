@@ -26,3 +26,4 @@ Thumbs.db
 
 # State (keep structure, not content)
 .state/compile_errors/
+.install_port
