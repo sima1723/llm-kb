@@ -243,7 +243,8 @@ install_python_deps() {
   fi
 
   info "安装核心依赖..."
-  $PIP_CMD --upgrade pip
+  # 系统 pip 不升级（Debian 管理的 pip 无法被 pip 自身覆盖）
+  [[ $USE_VENV -eq 1 ]] && $PIP_CMD --upgrade pip
   $PIP_CMD -r requirements.txt
   success "核心依赖安装完成"
 
