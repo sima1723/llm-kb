@@ -118,11 +118,13 @@ function bindUI() {
   // 抽屉内 Tabs
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      const siblings = tab.closest('.tabs').querySelectorAll('.tab');
+      siblings.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       const name = tab.dataset.tab;
-      document.getElementById('tab-url').style.display = name === 'url' ? '' : 'none';
-      document.getElementById('tab-pdf').style.display = name === 'pdf' ? '' : 'none';
+      document.getElementById('tab-url').style.display   = name === 'url'   ? '' : 'none';
+      document.getElementById('tab-pdf').style.display   = name === 'pdf'   ? '' : 'none';
+      document.getElementById('tab-video').style.display = name === 'video' ? '' : 'none';
     });
   });
 
@@ -140,6 +142,18 @@ function bindUI() {
     uploadPDFs(e.dataTransfer.files);
   });
   pdfInput.addEventListener('change', () => uploadPDFs(pdfInput.files));
+
+  // 生成抽屉
+  document.getElementById('btn-generate').addEventListener('click', () => openDrawer('generate'));
+  document.getElementById('generate-close').addEventListener('click', () => closeDrawers());
+  document.getElementById('btn-do-generate').addEventListener('click', doGenerate);
+
+  // 视频抓取
+  document.getElementById('btn-clip-video').addEventListener('click', doClipVideo);
+
+  // Stub 填充
+  document.getElementById('btn-fill-stubs').addEventListener('click', doFillStubs);
+  document.getElementById('stat-stubs').addEventListener('click', () => openDrawer('generate'));
 
   // 背景遮罩
   document.getElementById('backdrop').addEventListener('click', closeDrawers);
@@ -408,10 +422,11 @@ function openDrawer(name) {
   closeDrawers();
   document.getElementById(name + '-drawer').classList.add('open');
   document.getElementById('backdrop').classList.add('visible');
+  if (name === 'generate') loadStubList();
 }
 
 function closeDrawers() {
-  ['ingest', 'settings'].forEach(n => {
+  ['ingest', 'generate', 'settings'].forEach(n => {
     document.getElementById(n + '-drawer').classList.remove('open');
   });
   document.getElementById('backdrop').classList.remove('visible');
@@ -515,6 +530,7 @@ function startSSE() {
 // ── 状态栏 ───────────────────────────────────────────────────
 function startStatusPoll() {
   updateStatus();
+  loadStubList();
   state.statusPollTimer = setInterval(updateStatus, 8000);
 }
 
@@ -580,6 +596,137 @@ async function saveSettings() {
     msg.style.color = 'var(--red)';
   }
   setTimeout(() => { msg.textContent = ''; }, 2000);
+}
+
+// ── 视频字幕抓取 ─────────────────────────────────────────────
+async function doClipVideo() {
+  const url = document.getElementById('video-url-input').value.trim();
+  if (!url) return;
+  const lang = document.getElementById('video-lang').value.trim() || null;
+  const whisper = document.getElementById('video-whisper').checked;
+  const resultEl = document.getElementById('video-result');
+  const btn = document.getElementById('btn-clip-video');
+
+  btn.disabled = true;
+  btn.textContent = '提取中…';
+  resultEl.style.display = 'none';
+
+  try {
+    const r = await POST('/ingest/video', { url, lang, whisper });
+    resultEl.textContent = `✓ ${r.title}（${r.chars} 字符）`;
+    resultEl.style.color = 'var(--green)';
+    document.getElementById('video-url-input').value = '';
+    await triggerCompile();
+  } catch (e) {
+    resultEl.textContent = `✗ ${e.message}`;
+    resultEl.style.color = 'var(--red)';
+  } finally {
+    resultEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '提取字幕并编译';
+  }
+}
+
+// ── 内容生成 ─────────────────────────────────────────────────
+async function doGenerate() {
+  const topic = document.getElementById('gen-topic').value.trim();
+  if (!topic) return;
+  const format = document.querySelector('input[name="gen-format"]:checked').value;
+
+  const statusEl = document.getElementById('generate-status');
+  const resultWrap = document.getElementById('generate-result');
+  const btn = document.getElementById('btn-do-generate');
+
+  btn.disabled = true;
+  statusEl.textContent = '生成中，请稍候…';
+  statusEl.style.color = 'var(--text2)';
+  resultWrap.style.display = 'none';
+
+  try {
+    const r = await POST('/generate', { topic, format });
+    statusEl.textContent = `✓ 已生成  花费 $${(r.cost_usd || 0).toFixed(5)}`;
+    statusEl.style.color = 'var(--green)';
+
+    const metaEl = document.getElementById('generate-result-meta');
+    metaEl.textContent = r.path ? `保存至：${r.path}` : '';
+
+    const bodyEl = document.getElementById('generate-result-body');
+    bodyEl.innerHTML = renderMarkdown(r.content_md || '');
+    bindWikiLinks(bodyEl);
+    resultWrap.style.display = 'block';
+  } catch (e) {
+    statusEl.textContent = `✗ ${e.message}`;
+    statusEl.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Stub 填充 ────────────────────────────────────────────────
+async function loadStubList() {
+  const wrap = document.getElementById('stub-list-wrap');
+  const fillBtn = document.getElementById('btn-fill-stubs');
+  try {
+    const r = await GET('/stub/list');
+    const stubs = r.stubs || [];
+    if (stubs.length === 0) {
+      wrap.textContent = '暂无 stub 条目，知识库状态良好。';
+      fillBtn.disabled = true;
+    } else {
+      wrap.innerHTML = `共 <strong style="color:var(--yellow)">${stubs.length}</strong> 个待填充条目：<br><span style="color:var(--text2);font-size:12px">${stubs.map(s => s.name).join('、')}</span>`;
+      fillBtn.disabled = false;
+    }
+    // 更新状态栏
+    const statStubs = document.getElementById('stat-stubs');
+    if (stubs.length > 0) {
+      statStubs.textContent = `${stubs.length} stub 待填充`;
+      statStubs.style.color = 'var(--yellow)';
+      statStubs.style.display = '';
+    } else {
+      statStubs.style.display = 'none';
+    }
+  } catch (e) {
+    wrap.textContent = '无法加载 stub 列表';
+  }
+}
+
+async function doFillStubs() {
+  const btn = document.getElementById('btn-fill-stubs');
+  const logBox = document.getElementById('fill-log-box');
+  btn.disabled = true;
+  logBox.style.display = 'block';
+  logBox.innerHTML = '';
+  document.getElementById('fill-indicator').style.display = '';
+
+  try {
+    await POST('/stub/fill', {});
+    const es = new EventSource('/api/stub/stream');
+    es.onmessage = e => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'log') {
+        const p = document.createElement('p');
+        p.textContent = msg.line;
+        p.className = msg.line.includes('✓') ? 'ok' : msg.line.includes('✗') ? 'err' : '';
+        logBox.appendChild(p);
+        logBox.scrollTop = logBox.scrollHeight;
+      } else if (msg.type === 'done') {
+        es.close();
+        document.getElementById('fill-indicator').style.display = 'none';
+        btn.disabled = false;
+        loadStubList();
+        loadGraph();
+      }
+    };
+    es.onerror = () => {
+      es.close();
+      document.getElementById('fill-indicator').style.display = 'none';
+      btn.disabled = false;
+    };
+  } catch (e) {
+    logBox.innerHTML = `<p class="err">✗ ${e.message}</p>`;
+    document.getElementById('fill-indicator').style.display = 'none';
+    btn.disabled = false;
+  }
 }
 
 // ── 工具函数 ─────────────────────────────────────────────────

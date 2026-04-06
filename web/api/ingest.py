@@ -93,6 +93,32 @@ async def get_pending():
     return {"pending": pending, "count": len(pending)}
 
 
+@router.post("/ingest/video")
+async def clip_video(body: dict):
+    url = (body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "url is required")
+    lang = (body.get("lang") or "").strip() or None
+    use_whisper = bool(body.get("whisper", False))
+
+    output_dir = ROOT / "raw" / "media-notes"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from tools.video_to_md import process_video
+        result_path = process_video(url, output_dir, lang=lang, use_whisper=use_whisper)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+    content = result_path.read_text(encoding="utf-8")
+    return {
+        "filename": result_path.name,
+        "title": _extract_title(content),
+        "chars": len(content),
+        "path": str(result_path.relative_to(ROOT)),
+    }
+
+
 def _extract_title(content: str) -> str:
     for line in content.splitlines():
         line = line.strip()

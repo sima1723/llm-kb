@@ -20,13 +20,15 @@ app.add_middleware(
 )
 
 # 注册 API 路由
-from web.api import config, ingest, compile, wiki, query
+from web.api import config, ingest, compile, wiki, query, generate, maintenance
 
 app.include_router(config.router, prefix="/api")
 app.include_router(ingest.router, prefix="/api")
 app.include_router(compile.router, prefix="/api")
 app.include_router(wiki.router, prefix="/api")
 app.include_router(query.router, prefix="/api")
+app.include_router(generate.router, prefix="/api")
+app.include_router(maintenance.router, prefix="/api")
 
 # 静态文件
 STATIC_DIR = Path(__file__).parent / "static"
