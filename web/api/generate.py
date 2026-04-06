@@ -50,7 +50,7 @@ async def generate(body: dict):
             )
             client = LLMClient(config, tool="slides")
             max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("slides")
-            slides_content = await asyncio.to_thread(client.call, prompt, max_tokens)
+            slides_content = await asyncio.to_thread(client.call, prompt, max_tokens=max_tokens)
             if "marp: true" not in slides_content:
                 slides_content = "---\nmarp: true\ntheme: default\npaginate: true\n---\n\n" + slides_content
 
@@ -99,7 +99,7 @@ async def generate(body: dict):
             client = LLMClient(config, tool="brief" if fmt == "brief" else "report")
             max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get(
                 "brief" if fmt == "brief" else "report")
-            report_content = await asyncio.to_thread(client.call, prompt, max_tokens)
+            report_content = await asyncio.to_thread(client.call, prompt, max_tokens=max_tokens)
 
             if fmt == "report":
                 answers_dir = WIKI_DIR / "answers"

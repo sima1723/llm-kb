@@ -470,12 +470,18 @@ async function uploadPDFs(files) {
   const resultEl = document.getElementById('pdf-result');
   const results  = [];
   for (const file of Array.from(files)) {
+    resultEl.textContent = `⏳ 正在处理 ${file.name}…`;
+    resultEl.style.display = 'block';
     const fd = new FormData();
     fd.append('file', file);
     try {
       const res = await fetch('/api/ingest/upload', { method: 'POST', body: fd });
       const r = await res.json();
-      results.push(`✓ ${r.filename}（${r.chars} 字符）`);
+      if (!res.ok) {
+        results.push(`✗ ${file.name}: ${r.detail || res.status}`);
+      } else {
+        results.push(`✓ ${r.filename}（${r.chars} 字符）`);
+      }
     } catch (e) {
       results.push(`✗ ${file.name}: ${e.message}`);
     }
@@ -655,8 +661,22 @@ async function doGenerate() {
     bindWikiLinks(bodyEl);
     resultWrap.style.display = 'block';
   } catch (e) {
-    statusEl.textContent = `✗ ${e.message}`;
-    statusEl.style.color = 'var(--red)';
+    // 尝试解析后端返回的 JSON detail
+    let errMsg = e.message;
+    try {
+      const m = e.message.match(/^\d+: ([\s\S]+)/);
+      if (m) {
+        const body = JSON.parse(m[1]);
+        errMsg = body.detail || body.message || errMsg;
+      }
+    } catch (_) {}
+    statusEl.innerHTML =
+      `<span style="color:var(--red)">✗ 生成失败</span>` +
+      `<details style="margin-top:6px;font-size:12px;color:var(--text2)">` +
+      `<summary style="cursor:pointer">查看详情</summary>` +
+      `<pre style="white-space:pre-wrap;word-break:break-all;margin:4px 0">${esc(errMsg)}</pre>` +
+      `</details>`;
+    statusEl.style.color = '';
   } finally {
     btn.disabled = false;
   }
