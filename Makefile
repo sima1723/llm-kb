@@ -155,6 +155,19 @@ from tools.stats import count_raw_files, count_wiki_entries, count_pending_raw; 
 r = count_raw_files(); w = count_wiki_entries(); p = count_pending_raw(); \
 print(f'待处理: {p} 个 raw 文件  |  Wiki 条目: {w[\"total\"]} 篇  |  答案: {w[\"answers\"]} 条')"
 
+## test-api: 测试 API Key 和模型连通性（快速排查 model_not_found）
+test-api:
+	$(PYTHON) -c "\
+import sys, yaml, os; sys.path.insert(0,'.');\
+cfg = yaml.safe_load(open('config.yaml').read());\
+from tools.llm_client import LLMClient;\
+c = LLMClient(cfg);\
+r = c.call('Reply OK', max_tokens=5);\
+print('✓ API 连通，模型响应:', r);\
+print('  模型:', cfg.get('llm',{}).get('model',''));\
+print('  base_url:', cfg.get('base_url','（官方）'));\
+"
+
 ## web-install: 安装 Web 服务依赖
 web-install:
 	pip install -r web/requirements.txt

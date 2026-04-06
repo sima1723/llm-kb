@@ -147,16 +147,20 @@ class LLMClient:
 
             except self._anthropic.APIStatusError as e:
                 last_error = e
+                # 完整错误体（供调试）
+                err_body = getattr(e, 'body', None) or str(e)
                 if e.status_code in (429, 529):  # rate limit / overload
                     wait = self.retry_delay_base ** (attempt + 1)
                     logger.warning(f"限流，{wait}s 后重试（{attempt+1}/{self.retry_count}）")
                     time.sleep(wait)
                 elif e.status_code >= 500:
                     wait = self.retry_delay_base ** (attempt + 1)
-                    logger.warning(f"服务器错误 {e.status_code}，{wait}s 后重试")
+                    logger.warning(f"服务器错误 {e.status_code}，{wait}s 后重试\n  详情: {err_body}")
                     time.sleep(wait)
                 else:
-                    raise  # 4xx 非限流错误直接抛出
+                    # 4xx：配置错误（model_not_found、invalid_api_key 等），立即失败
+                    logger.error(f"API 错误 {e.status_code}（不重试）: {err_body}")
+                    raise
 
             except Exception as e:
                 last_error = e
