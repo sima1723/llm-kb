@@ -10,7 +10,8 @@
 #   DEPLOY_USER     = SSH 用户名（如 ubuntu / root）
 #   DEPLOY_KEY      = SSH 私钥内容（cat ~/.ssh/id_rsa）
 #   DEPLOY_PATH     = 项目在服务器上的路径（如 /home/ubuntu/llm-kb）
-#   ANTHROPIC_API_KEY = sk-ant-...（首次部署时写入 config.yaml）
+#   ANTHROPIC_API_KEY  = sk-ant-...（必须）
+#   ANTHROPIC_BASE_URL = https://...（可选，使用中转服务时填写）
 # ================================================================
 
 name: 部署 Web 界面

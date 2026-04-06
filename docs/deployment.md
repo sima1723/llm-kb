@@ -38,11 +38,20 @@ git push -u origin master
 
 打开仓库页面 → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 
-| Secret 名 | 值 | 说明 |
+| Secret 名 | 值 | 必填 |
 |-----------|-----|------|
-| `ANTHROPIC_API_KEY` | `sk-ant-api03-...` | Anthropic API Key，必须 |
+| `ANTHROPIC_API_KEY` | `sk-ant-api03-...` | 必须 |
+| `ANTHROPIC_BASE_URL` | `https://api.relay.example.com` | 可选（使用中转服务时填，留空则走官方 API） |
 
-> 私钥只存在 GitHub Secrets 中，不会出现在代码或日志里。
+**如何添加：**
+
+1. 仓库页面顶部点 **Settings**
+2. 左侧菜单 → **Secrets and variables** → **Actions**
+3. 点击 **New repository secret**
+4. Name 填 `ANTHROPIC_API_KEY`，Secret 填你的 Key，点 **Add secret**
+5. 如果使用中转服务，重复上步添加 `ANTHROPIC_BASE_URL`
+
+> Secrets 内容加密存储，日志中自动打码，不会泄露。
 
 ### 第三步：工作流文件已就位
 
