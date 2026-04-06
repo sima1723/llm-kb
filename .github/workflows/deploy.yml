@@ -1,0 +1,58 @@
+# ================================================================
+# 部署 Web 界面到 VPS（通过 SSH）
+#
+# 触发时机：
+#   - master/main 分支有推送时自动部署
+#   - 手动触发
+#
+# 需要在 repo Settings → Secrets → Actions 中添加：
+#   DEPLOY_HOST     = 你的服务器 IP 或域名
+#   DEPLOY_USER     = SSH 用户名（如 ubuntu / root）
+#   DEPLOY_KEY      = SSH 私钥内容（cat ~/.ssh/id_rsa）
+#   DEPLOY_PATH     = 项目在服务器上的路径（如 /home/ubuntu/llm-kb）
+#   ANTHROPIC_API_KEY = sk-ant-...（首次部署时写入 config.yaml）
+# ================================================================
+
+name: 部署 Web 界面
+
+on:
+  push:
+    branches: [master, main]
+    paths-ignore:
+      - 'raw/**'            # raw 文件变更不触发部署（只触发编译）
+      - '**.md'             # 文档变更不触发部署
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: SSH 部署到服务器
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 部署到服务器
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key:      ${{ secrets.DEPLOY_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            echo ">>> 拉取最新代码"
+            git pull origin ${{ github.ref_name }}
+
+            echo ">>> 安装/更新依赖"
+            pip install -r requirements.txt -r web/requirements.txt -q
+
+            echo ">>> 重启 Web 服务"
+            # 使用 systemd 管理进程（推荐）
+            sudo systemctl restart llm-kb || \
+            # 若未配置 systemd，则用 pm2 / supervisord
+            pm2 restart llm-kb 2>/dev/null || \
+            echo "⚠ 请手动重启服务"
+
+            echo ">>> 部署完成"

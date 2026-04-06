@@ -1,0 +1,76 @@
+# ================================================================
+# Auto-compile wiki
+#
+# 触发时机：
+#   1. 向 raw/** 推送新文件时（自动增量编译）
+#   2. 手动触发（可选全量重编译）
+#   3. 定时：每天凌晨 2 点（如有未编译的文件）
+#
+# 需要在 repo Settings → Secrets → Actions 中添加：
+#   ANTHROPIC_API_KEY = sk-ant-...
+# ================================================================
+
+name: 自动编译 Wiki
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'raw/**'            # 只有 raw/ 目录变更才触发
+  schedule:
+    - cron: '0 18 * * *'   # 每天 UTC 18:00（北京时间 02:00）
+  workflow_dispatch:        # 支持手动触发
+    inputs:
+      full:
+        description: '全量重编译（忽略缓存）'
+        type: boolean
+        default: false
+
+jobs:
+  compile:
+    name: 编译知识库
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # 需要写权限以推回 wiki/ 变更
+
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # 需要完整历史以便推送
+
+      - name: 设置 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 编译 Wiki
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ "${{ inputs.full }}" = "true" ]; then
+            echo ">>> 全量重编译模式"
+            python tools/compile_wiki.py --full
+          else
+            echo ">>> 增量编译模式"
+            python tools/compile_wiki.py
+          fi
+
+      - name: 提交 wiki/ 变更
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add wiki/
+          # 若无变更则跳过提交（避免空 commit）
+          if git diff --staged --quiet; then
+            echo ">>> wiki 无变更，跳过提交"
+          else
+            ENTRIES=$(git diff --staged --name-only wiki/ | wc -l | tr -d ' ')
+            git commit -m "auto: 编译 wiki — ${ENTRIES} 个条目更新 [skip ci]"
+            git push origin ${{ github.ref_name }}
+            echo ">>> 已推送 ${ENTRIES} 个条目变更"
+          fi
