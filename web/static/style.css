@@ -84,18 +84,20 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 /* ── Log Panel ─────────────────────────────────────────────── */
 #log-panel {
   position: fixed;
-  bottom: var(--statusbar-h);
+  bottom: 0;           /* 从视口底部算起，完全独立于状态栏 */
   left: 0; right: 0;
-  height: 240px;
+  /* 面板高度 = 内容区 + 状态栏高度，打开时覆盖状态栏 */
+  height: calc(240px + var(--statusbar-h));
   background: var(--bg);
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transform: translateY(100%);
-  transition: transform 0.2s ease;
+  transform: translateY(100%);   /* 100% = 整个面板高度，完全滑出视口 */
+  transition: transform 0.22s ease;
   z-index: 60;
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
 }
+/* 打开时：面板占据底部区域，覆盖状态栏（关闭按钮在面板内） */
 #log-panel.open { transform: translateY(0); }
 
 #log-panel-header {
