@@ -71,6 +71,28 @@ detect_os() {
 OS=$(detect_os)
 success "检测到系统：$OS"
 
+# ── 权限前缀：root 不需要 sudo ────────────────────────────────
+if [[ $EUID -eq 0 ]]; then
+  SUDO=""
+else
+  SUDO="sudo"
+fi
+
+# ── Bootstrap：确保 git / curl 可用（裸容器场景）─────────────
+_bootstrap_debian() {
+  local need=()
+  command -v git  &>/dev/null || need+=(git)
+  command -v curl &>/dev/null || need+=(curl)
+  if [[ ${#need[@]} -gt 0 ]]; then
+    info "Bootstrap：安装 ${need[*]}..."
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y "${need[@]}"
+  fi
+}
+case "$OS" in
+  debian) _bootstrap_debian ;;
+esac
+
 # 读取带默认值的输入
 prompt_input() {
   local label="$1" default="$2" var_name="$3" secret="${4:-}"
@@ -145,17 +167,17 @@ install_deps() {
         PYTHON="python3.11"
         ;;
       debian)
-        sudo apt-get update -qq
-        sudo apt-get install -y python3.11 python3.11-venv python3-pip
+        $SUDO apt-get update -qq
+        $SUDO apt-get install -y python3.11 python3.11-venv python3-pip
         PYTHON="python3.11"
         ;;
       rpm)
-        sudo dnf install -y python3.11 python3.11-pip || \
-        sudo yum install -y python3.11 python3-pip
+        $SUDO dnf install -y python3.11 python3.11-pip || \
+        $SUDO yum install -y python3.11 python3-pip
         PYTHON="python3.11"
         ;;
       arch)
-        sudo pacman -Sy --noconfirm python
+        $SUDO pacman -Sy --noconfirm python
         PYTHON="python3"
         ;;
       *)
@@ -170,17 +192,17 @@ install_deps() {
   if [[ "$OS" == "debian" ]] && ! $PYTHON -m venv --help &>/dev/null 2>&1; then
     info "安装 python3-venv..."
     PYVER=$($PYTHON -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-    sudo apt-get install -y "python${PYVER}-venv" 2>/dev/null || \
-    sudo apt-get install -y python3-venv
+    $SUDO apt-get install -y "python${PYVER}-venv" 2>/dev/null || \
+    $SUDO apt-get install -y python3-venv
   fi
 
   # ── pip ─────────────────────────────────────────────────────
   if ! $PYTHON -m pip --version &>/dev/null; then
     case "$OS" in
       macos)   brew install python@3.11 ;;
-      debian)  sudo apt-get install -y python3-pip ;;
-      rpm)     sudo dnf install -y python3-pip ;;
-      arch)    sudo pacman -Sy --noconfirm python-pip ;;
+      debian)  $SUDO apt-get install -y python3-pip ;;
+      rpm)     $SUDO dnf install -y python3-pip ;;
+      arch)    $SUDO pacman -Sy --noconfirm python-pip ;;
     esac
   fi
   success "pip: $($PYTHON -m pip --version | awk '{print $2}')"
@@ -190,9 +212,9 @@ install_deps() {
     info "安装 git..."
     case "$OS" in
       macos)   brew install git ;;
-      debian)  sudo apt-get install -y git ;;
-      rpm)     sudo dnf install -y git ;;
-      arch)    sudo pacman -Sy --noconfirm git ;;
+      debian)  $SUDO apt-get install -y git ;;
+      rpm)     $SUDO dnf install -y git ;;
+      arch)    $SUDO pacman -Sy --noconfirm git ;;
     esac
   fi
   success "git: $(git --version | awk '{print $3}')"
