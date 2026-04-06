@@ -215,10 +215,19 @@ install_python_deps() {
   if [[ "${use_venv_ans,,}" == "n" ]]; then
     USE_VENV=0
     # Ubuntu 24.04+ / Debian 12+ PEP 668 保护，需要加 --break-system-packages
+    # 检测 PEP 668（Ubuntu 24.04+ / Debian 12+）：存在 EXTERNALLY-MANAGED 文件则需要加标志
     PIP_FLAGS=""
-    if $PYTHON -m pip install --dry-run pip 2>&1 | grep -q "externally-managed"; then
-      PIP_FLAGS="--break-system-packages"
-    fi
+    PYVER=$($PYTHON -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    for marker in \
+      "/usr/lib/python${PYVER}/EXTERNALLY-MANAGED" \
+      "/usr/lib/python3/dist-packages/EXTERNALLY-MANAGED" \
+      "$($PYTHON -c 'import sysconfig; print(sysconfig.get_path("stdlib"))')/EXTERNALLY-MANAGED"; do
+      if [[ -f "$marker" ]]; then
+        PIP_FLAGS="--break-system-packages"
+        warn "检测到 PEP 668 保护，使用 --break-system-packages 安装"
+        break
+      fi
+    done
     PIP_CMD="$PYTHON -m pip install -q $PIP_FLAGS"
     success "使用系统 Python（$($PYTHON --version)）"
   else
