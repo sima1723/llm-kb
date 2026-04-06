@@ -73,13 +73,15 @@ async def start_compile(body: dict = {}):
     if _compile_state["running"]:
         return {"ok": False, "reason": "already running"}
     mode = body.get("mode", "incremental")
+    # 先设 running=True，防止 SSE 在 task 启动前就看到 running=False 发出 done
+    _compile_state["running"] = True
+    _compile_state["log"] = []
     asyncio.create_task(_run_compile(full=(mode == "full")))
     return {"ok": True, "mode": mode}
 
 
 async def _run_compile(full: bool = False):
-    _compile_state["running"] = True
-    _compile_state["log"] = []
+    # running already set to True in start_compile
     try:
         cmd = [sys.executable, str(ROOT / "tools" / "compile_wiki.py")]
         if full:

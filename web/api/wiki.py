@@ -117,11 +117,18 @@ async def get_graph():
 @router.get("/wiki/entry/{name:path}")
 async def get_entry(name: str):
     """返回条目内容（HTML + 元数据 + 链接关系）"""
-    # 支持 answers/xxx 形式
-    if name.startswith("answers/"):
-        md_path = WIKI_DIR / "answers" / (name[8:] + ".md")
-    else:
-        md_path = WIKI_DIR / (name + ".md")
+    # 安全：防止路径穿越
+    try:
+        if name.startswith("answers/"):
+            md_path = (WIKI_DIR / "answers" / (name[8:] + ".md")).resolve()
+            allowed_root = (WIKI_DIR / "answers").resolve()
+        else:
+            md_path = (WIKI_DIR / (name + ".md")).resolve()
+            allowed_root = WIKI_DIR.resolve()
+        if not md_path.is_relative_to(allowed_root):
+            raise HTTPException(403, "Access denied")
+    except ValueError:
+        raise HTTPException(400, "Invalid entry name")
 
     if not md_path.exists():
         raise HTTPException(404, f"Entry '{name}' not found")

@@ -1,7 +1,7 @@
 """配置 API — 读写 config.yaml，验证 API Key"""
+import asyncio
 import time
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from fastapi import APIRouter
@@ -13,6 +13,8 @@ CONFIG_FILE = ROOT / "config.yaml"
 
 
 def _load() -> dict:
+    if not CONFIG_FILE.exists():
+        return {}
     return yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
 
 
@@ -64,7 +66,7 @@ async def test_config():
     try:
         client = LLMClient(cfg)
         t0 = time.time()
-        resp = client.call("Reply with just the word: OK", max_tokens=5)
+        await asyncio.to_thread(client.call, "Reply with just the word: OK", 5)
         latency_ms = int((time.time() - t0) * 1000)
         return {"ok": True, "model": cfg.get("llm", {}).get("model", ""), "latency_ms": latency_ms}
     except Exception as e:
