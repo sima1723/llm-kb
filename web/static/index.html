@@ -50,7 +50,7 @@
   </div>
 
   <!-- 状态栏 -->
-  <div id="statusbar">
+  <div id="statusbar" title="点击查看运行日志">
     <span id="stat-entries">—</span>
     <span id="stat-answers">—</span>
     <span id="stat-pending">—</span>
@@ -63,7 +63,19 @@
     <span id="fill-indicator" style="display:none">
       <span class="spinner"></span>&nbsp;填充中…
     </span>
+    <span style="margin-left:auto;opacity:0.4;font-size:11px;">▲ 日志</span>
   </div>
+</div>
+
+<!-- 日志面板（从底部滑出，覆盖在状态栏上方） -->
+<div id="log-panel">
+  <div id="log-panel-header">
+    <span id="log-panel-title">运行日志</span>
+    <span id="log-panel-status"></span>
+    <button id="log-panel-clear" title="清空日志">清空</button>
+    <button id="log-panel-close">✕</button>
+  </div>
+  <div id="log-panel-body"></div>
 </div>
 
 <!-- 添加内容抽屉 -->

@@ -13,7 +13,72 @@ const state = {
   sidebarMode: null,   // 'entry' | 'search' | 'ask'
   compileRunning: false,
   statusPollTimer: null,
+  logBuffer: [],       // 保留最近 500 条日志
 };
+
+// ── 日志面板 ──────────────────────────────────────────────────
+function toggleLogPanel() {
+  const panel = document.getElementById('log-panel');
+  panel.classList.toggle('open');
+}
+function openLogPanel() {
+  document.getElementById('log-panel').classList.add('open');
+}
+function closeLogPanel() {
+  document.getElementById('log-panel').classList.remove('open');
+}
+
+function appendLog(line, cls) {
+  // 推入 buffer（限 500 条）
+  const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  const entry = { line, cls: cls || _logClass(line), time: now };
+  state.logBuffer.push(entry);
+  if (state.logBuffer.length > 500) state.logBuffer.shift();
+
+  // 写入面板 DOM
+  const body = document.getElementById('log-panel-body');
+  const p = document.createElement('p');
+  p.className = entry.cls;
+  p.innerHTML = `<span class="log-time">${now}</span>${esc(line)}`;
+  body.appendChild(p);
+  body.scrollTop = body.scrollHeight;
+
+  // 同步写入 ingest 抽屉里的 compile-log-box（兼容旧逻辑）
+  const legacyBox = document.getElementById('compile-log-box');
+  if (legacyBox && legacyBox.style.display !== 'none') {
+    const p2 = document.createElement('p');
+    p2.textContent = line;
+    p2.className = entry.cls;
+    legacyBox.appendChild(p2);
+    legacyBox.scrollTop = legacyBox.scrollHeight;
+  }
+}
+
+function _logClass(line) {
+  if (line.includes('✓') || line.includes('完成') || line.includes('成功')) return 'ok';
+  if (line.includes('✗') || line.includes('错误') || line.includes('失败') || line.includes('Error')) return 'err';
+  if (line.includes('⚠') || line.includes('警告') || line.includes('Warning')) return 'warn';
+  if (line.includes('▶') || line.includes('编译') || line.includes('处理')) return 'info';
+  return '';
+}
+
+function setLogStatus(text, cls) {
+  const el = document.getElementById('log-panel-status');
+  el.textContent = text;
+  el.style.color = cls === 'ok' ? 'var(--green)' : cls === 'err' ? 'var(--red)' : 'var(--text2)';
+}
+
+function renderLogBuffer() {
+  const body = document.getElementById('log-panel-body');
+  body.innerHTML = '';
+  for (const entry of state.logBuffer) {
+    const p = document.createElement('p');
+    p.className = entry.cls;
+    p.innerHTML = `<span class="log-time">${entry.time}</span>${esc(entry.line)}`;
+    body.appendChild(p);
+  }
+  body.scrollTop = body.scrollHeight;
+}
 
 // ── API 工具 ──────────────────────────────────────────────────
 async function api(method, path, body) {
@@ -153,10 +218,24 @@ function bindUI() {
 
   // Stub 填充
   document.getElementById('btn-fill-stubs').addEventListener('click', doFillStubs);
-  document.getElementById('stat-stubs').addEventListener('click', () => openDrawer('generate'));
+  document.getElementById('stat-stubs').addEventListener('click', e => {
+    e.stopPropagation();
+    openDrawer('generate');
+  });
 
   // 背景遮罩
   document.getElementById('backdrop').addEventListener('click', closeDrawers);
+
+  // 状态栏点击 → 日志面板
+  document.getElementById('statusbar').addEventListener('click', toggleLogPanel);
+
+  // 日志面板按钮
+  document.getElementById('log-panel-close').addEventListener('click', closeLogPanel);
+  document.getElementById('log-panel-clear').addEventListener('click', () => {
+    state.logBuffer = [];
+    document.getElementById('log-panel-body').innerHTML = '';
+    setLogStatus('');
+  });
 }
 
 // ── 搜索 / 问答 ───────────────────────────────────────────────
@@ -472,18 +551,25 @@ async function uploadPDFs(files) {
   for (const file of Array.from(files)) {
     resultEl.textContent = `⏳ 正在处理 ${file.name}…`;
     resultEl.style.display = 'block';
+    appendLog(`▶ 上传 ${file.name}`, 'info');
     const fd = new FormData();
     fd.append('file', file);
     try {
       const res = await fetch('/api/ingest/upload', { method: 'POST', body: fd });
       const r = await res.json();
       if (!res.ok) {
-        results.push(`✗ ${file.name}: ${r.detail || res.status}`);
+        const msg = `✗ ${file.name}: ${r.detail || res.status}`;
+        results.push(msg);
+        appendLog(msg, 'err');
       } else {
-        results.push(`✓ ${r.filename}（${r.chars} 字符）`);
+        const msg = `✓ ${r.filename}（${r.chars} 字符）`;
+        results.push(msg);
+        appendLog(msg, 'ok');
       }
     } catch (e) {
-      results.push(`✗ ${file.name}: ${e.message}`);
+      const msg = `✗ ${file.name}: ${e.message}`;
+      results.push(msg);
+      appendLog(msg, 'err');
     }
   }
   resultEl.textContent = results.join('\n');
@@ -504,32 +590,40 @@ async function triggerCompile() {
 }
 
 function startSSE() {
+  // 准备 ingest 抽屉里的 log box（兼容）
   const logBox = document.getElementById('compile-log-box');
   logBox.style.display = 'block';
   logBox.innerHTML = '';
+
   document.getElementById('compile-indicator').style.display = '';
+  setLogStatus('编译中…');
+  openLogPanel();   // 自动打开日志面板
+  appendLog('▶ 开始编译', 'info');
 
   const es = new EventSource('/api/compile/stream');
   es.onmessage = e => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'log') {
-      const p = document.createElement('p');
-      p.textContent = msg.line;
-      p.className = msg.line.includes('✓') ? 'ok' : msg.line.includes('✗') ? 'err' : '';
-      logBox.appendChild(p);
-      logBox.scrollTop = logBox.scrollHeight;
+      appendLog(msg.line);
     } else if (msg.type === 'done') {
       es.close();
       state.compileRunning = false;
       document.getElementById('compile-indicator').style.display = 'none';
-      // 重新加载图谱
+      const summary = msg.summary || '';
+      appendLog('✓ 编译完成' + (summary ? ` — ${summary}` : ''), 'ok');
+      setLogStatus('完成', 'ok');
       setTimeout(() => { loadGraph(); updateStatus(); }, 500);
+    } else if (msg.type === 'error') {
+      appendLog('✗ ' + (msg.message || '编译出错'), 'err');
+      setLogStatus('出错', 'err');
     }
   };
   es.onerror = () => {
     es.close();
     state.compileRunning = false;
     document.getElementById('compile-indicator').style.display = 'none';
+    appendLog('✗ SSE 连接断开', 'err');
+    setLogStatus('断开', 'err');
   };
 }
 
