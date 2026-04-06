@@ -262,8 +262,8 @@ install_python_deps() {
     success "使用镜像：$MIRROR_URL"
   fi
 
-  # 加超时和重试，防止网络抖动失败
-  PIP_CMD="$PIP_CMD --timeout 60 --retries 3"
+  # 加超时和重试，防止网络抖动失败；root 下运行抑制 venv 警告（专用服务器正常）
+  PIP_CMD="$PIP_CMD --timeout 60 --retries 3 --root-user-action=ignore"
 
   info "安装核心依赖..."
   # 系统 pip 不升级（Debian 管理的 pip 无法被 pip 自身覆盖）
