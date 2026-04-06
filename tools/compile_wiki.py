@@ -316,7 +316,7 @@ def main(full, dry_run, single_file, config_path, do_git_commit, skip_git_commit
     console.print(f"[bold]开始编译[/bold]：{len(pending)} 个文件待处理")
 
     # 初始化 LLM 客户端
-    client = LLMClient(config)
+    client = LLMClient(config, tool="compile")
 
     total = len(pending)
     success = 0

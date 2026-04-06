@@ -408,7 +408,7 @@ def apply_ai_fixes(issues: list[Issue], wiki_dir: Path, config: dict, dry_run: b
     try:
         from tools.llm_client import LLMClient
         from tools.parser import parse_wiki_entries
-        client = LLMClient(config)
+        client = LLMClient(config, tool="lint_ai")
     except Exception as e:
         print(f"初始化 LLM 失败: {e}")
         return

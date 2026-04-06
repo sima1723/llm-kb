@@ -48,7 +48,7 @@ async def generate(body: dict):
             prompt = _SLIDES_PROMPT.format(
                 topic=topic, language=language, wiki_entries="\n\n".join(entries_text)
             )
-            client = LLMClient(config)
+            client = LLMClient(config, tool="slides")
             max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("slides")
             slides_content = await asyncio.to_thread(client.call, prompt, max_tokens)
             if "marp: true" not in slides_content:
@@ -96,8 +96,9 @@ async def generate(body: dict):
             template = _PROMPT_MD if fmt == "report" else _PROMPT_BRIEF
             prompt = template.format(topic=topic, language=language, wiki_entries=wiki_entries)
 
-            client = LLMClient(config)
-            max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("report")
+            client = LLMClient(config, tool="brief" if fmt == "brief" else "report")
+            max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get(
+                "brief" if fmt == "brief" else "report")
             report_content = await asyncio.to_thread(client.call, prompt, max_tokens)
 
             if fmt == "report":

@@ -172,7 +172,7 @@ def main(question: str, save: bool, deep: bool, wiki_dir: Optional[str]):
 
     # 3. 调用 LLM
     try:
-        client = LLMClient(config)
+        client = LLMClient(config, tool="ask")
     except Exception as e:
         print(f"初始化 LLM 客户端失败: {e}")
         sys.exit(1)

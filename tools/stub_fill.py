@@ -250,7 +250,7 @@ def main(entry: Optional[str], dry_run: bool):
         return
 
     # 实际填充
-    client = LLMClient(config)
+    client = LLMClient(config, tool="stub_fill")
     success, failed = 0, []
 
     if console:

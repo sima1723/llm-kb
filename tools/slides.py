@@ -123,7 +123,7 @@ def main(topic: str, top_k: int, wiki_dir: Optional[str]):
     )
 
     # 调用 LLM
-    client = LLMClient(config)
+    client = LLMClient(config, tool="slides")
     slides_max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("slides")
     if HAS_RICH:
         with console.status("[cyan]正在生成幻灯片...[/cyan]"):

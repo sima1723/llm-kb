@@ -26,10 +26,12 @@ class LLMClient:
     - 预算上限保护
     """
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, tool: Optional[str] = None):
         """
         参数：
           config: 来自 config.yaml 的完整配置字典
+          tool:   工具名（如 "compile" / "stub_fill" / "ask"），
+                  用于从 model_by_tool 自动选取合适模型和计价
         """
         try:
             import anthropic
@@ -40,14 +42,24 @@ class LLMClient:
         llm_cfg = config.get("llm", {})
         compile_cfg = config.get("compile", {})
 
-        self.model = llm_cfg.get("model", "claude-sonnet-4-20250514")
-        self.max_tokens = llm_cfg.get("max_tokens", 8192)
+        # 按工具选模型；未配置则用默认模型
+        default_model = llm_cfg.get("model", "claude-sonnet-4-6")
+        self.model = llm_cfg.get("model_by_tool", {}).get(tool, default_model) if tool else default_model
+
+        self.max_tokens = llm_cfg.get("max_tokens", 4096)
         self.retry_count = llm_cfg.get("retry_count", 3)
         self.retry_delay_base = llm_cfg.get("retry_delay_base", 2)
 
         self.budget_limit = compile_cfg.get("budget_limit_usd", 5.0)
-        self.input_price = compile_cfg.get("input_price_per_mtok", 3.0)   # per 1M tokens
-        self.output_price = compile_cfg.get("output_price_per_mtok", 15.0)
+
+        # 按实际所选模型查定价；兜底：旧字段 input_price_per_mtok
+        pricing = llm_cfg.get("pricing", {}).get(self.model, {})
+        self.input_price  = pricing.get("input",  compile_cfg.get("input_price_per_mtok",  3.0))
+        self.output_price = pricing.get("output", compile_cfg.get("output_price_per_mtok", 15.0))
+
+        if tool:
+            logger.debug(f"LLMClient tool={tool} → model={self.model} "
+                         f"(${self.input_price}/${self.output_price} per M tokens)")
 
         # 认证优先级：config.yaml api_key > 环境变量 ANTHROPIC_API_KEY > Claude Code OAuth token
         api_key = config.get("api_key", "").strip() or os.environ.get("ANTHROPIC_API_KEY", "")

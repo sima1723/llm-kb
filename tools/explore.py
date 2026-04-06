@@ -174,7 +174,7 @@ def main(add: bool, dry_run: bool, wiki_dir: Optional[str]):
 
     prompt = _EXPLORE_PROMPT.format(language=language, kb_summary=kb_summary)
 
-    client = LLMClient(config)
+    client = LLMClient(config, tool="explore")
     explore_max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("explore")
     if HAS_RICH:
         with console.status("[cyan]正在生成探索建议...[/cyan]"):

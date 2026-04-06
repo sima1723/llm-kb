@@ -78,7 +78,7 @@ async def ask(body: dict):
     else:
         prompt = f"根据以下知识库回答问题：\n\n{context_text}\n\n问题：{question}"
 
-    client = LLMClient(config)
+    client = LLMClient(config, tool="ask")
     max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("ask", 4096)
     answer_text = await asyncio.to_thread(client.call, prompt, max_tokens)
     cost = client.get_cost_summary()["cost_usd"]

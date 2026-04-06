@@ -128,7 +128,8 @@ def main(topic: str, fmt: str, top_k: int, wiki_dir: Optional[str]):
         prompt = _PROMPT_BRIEF.format(topic=topic, language=language, wiki_entries=wiki_entries)
 
     # 调用 LLM
-    client = LLMClient(config)
+    # brief 用 Haiku（单段摘要），完整报告用 Sonnet（深度写作）
+    client = LLMClient(config, tool="brief" if fmt == "brief" else "report")
     if HAS_RICH:
         with console.status("[cyan]正在生成报告...[/cyan]"):
             report_content = client.call(prompt, max_tokens=report_max_tokens)
