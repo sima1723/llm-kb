@@ -215,7 +215,6 @@ install_python_deps() {
   if [[ "${use_venv_ans,,}" == "n" ]]; then
     USE_VENV=0
     # Ubuntu 24.04+ / Debian 12+ PEP 668 保护，需要加 --break-system-packages
-    # 检测 PEP 668（Ubuntu 24.04+ / Debian 12+）：存在 EXTERNALLY-MANAGED 文件则需要加标志
     PIP_FLAGS=""
     PYVER=$($PYTHON -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
     for marker in \
@@ -241,6 +240,30 @@ install_python_deps() {
     PIP_CMD="pip install -q"
     success "虚拟环境已激活"
   fi
+
+  # ── 询问是否使用国内镜像 ──────────────────────────────────────
+  echo ""
+  echo -e "  ${BOLD}pip 下载源${NC}"
+  prompt_choice "选择镜像（国内服务器推荐选镜像）" "1" PIP_MIRROR \
+    "官方 PyPI (pypi.org)" \
+    "清华大学 (tuna.tsinghua.edu.cn)" \
+    "阿里云 (mirrors.aliyun.com)" \
+    "中科大 (pypi.mirrors.ustc.edu.cn)"
+
+  case "$PIP_MIRROR" in
+    *清华*) MIRROR_URL="https://pypi.tuna.tsinghua.edu.cn/simple" ;;
+    *阿里*) MIRROR_URL="https://mirrors.aliyun.com/pypi/simple" ;;
+    *中科*) MIRROR_URL="https://pypi.mirrors.ustc.edu.cn/simple" ;;
+    *)      MIRROR_URL="" ;;
+  esac
+
+  if [[ -n "$MIRROR_URL" ]]; then
+    PIP_CMD="$PIP_CMD -i $MIRROR_URL --trusted-host $(echo $MIRROR_URL | sed 's|https://||;s|/.*||')"
+    success "使用镜像：$MIRROR_URL"
+  fi
+
+  # 加超时和重试，防止网络抖动失败
+  PIP_CMD="$PIP_CMD --timeout 60 --retries 3"
 
   info "安装核心依赖..."
   # 系统 pip 不升级（Debian 管理的 pip 无法被 pip 自身覆盖）
