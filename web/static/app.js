@@ -215,7 +215,7 @@ function renderAskResult(question, r) {
     </div>`;
 
   const content = document.getElementById('answer-content');
-  content.innerHTML = renderMarkdown(r.answer_md || r.answer_html || '');
+  content.innerHTML = renderMarkdown(r.answer_md || '');
   bindWikiLinks(content);
 }
 
@@ -699,7 +699,13 @@ async function doFillStubs() {
   document.getElementById('fill-indicator').style.display = '';
 
   try {
-    await POST('/stub/fill', {});
+    const r = await POST('/stub/fill', {});
+    if (!r.ok) {
+      logBox.innerHTML = `<p class="err">✗ ${r.message || '启动失败'}</p>`;
+      document.getElementById('fill-indicator').style.display = 'none';
+      btn.disabled = false;
+      return;
+    }
     const es = new EventSource('/api/stub/stream');
     es.onmessage = e => {
       const msg = JSON.parse(e.data);

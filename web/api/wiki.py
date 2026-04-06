@@ -30,11 +30,11 @@ def _extract_links(content: str) -> list[str]:
     return list(dict.fromkeys(re.findall(r'\[\[(.+?)\]\]', content)))
 
 
-def _entry_type(meta: dict, filename: str) -> str:
+def _entry_type(meta: dict, body_preview: str = "") -> str:
     tags = meta.get("tags", [])
     if isinstance(tags, list) and "stub" in tags:
         return "stub"
-    if "待补充" in open(WIKI_DIR / filename, encoding="utf-8").read()[:200]:
+    if "待补充" in body_preview[:200]:
         return "stub"
     source_type = str(meta.get("source_type", ""))
     if source_type == "answer":
@@ -72,7 +72,7 @@ async def get_graph():
         for lk in links:
             link_counts[lk] = link_counts.get(lk, 0) + 1
 
-        node_type = _entry_type(meta, md.name)
+        node_type = _entry_type(meta, body)
         desc = ""
         for line in body.splitlines():
             line = line.strip()
@@ -171,7 +171,7 @@ async def get_index():
             "description": desc,
             "link_count": len(_extract_links(content)),
             "source_count": len(meta.get("sources", [])) if isinstance(meta.get("sources"), list) else 0,
-            "type": _entry_type(meta, md.name),
+            "type": _entry_type(meta, body),
         })
     return {"entries": entries, "total": len(entries)}
 

@@ -1,4 +1,5 @@
 """查询 API — TF-IDF 搜索 + LLM 问答"""
+import asyncio
 import re
 import sys
 from pathlib import Path
@@ -79,7 +80,7 @@ async def ask(body: dict):
 
     client = LLMClient(config)
     max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("ask", 4096)
-    answer_text = client.call(prompt, max_tokens=max_tokens)
+    answer_text = await asyncio.to_thread(client.call, prompt, max_tokens)
     cost = client.get_cost_summary()["cost_usd"]
 
     # [[链接]] 替换为可点击 span

@@ -61,7 +61,7 @@ async def fill_stubs(body: dict):
     entry = (body.get("entry") or "").strip() or None
     _fill_state = {"running": True, "log": [], "done": False, "entry": entry}
 
-    asyncio.get_event_loop().run_in_executor(None, _run_fill, entry)
+    asyncio.get_running_loop().run_in_executor(None, _run_fill, entry)
     return {"ok": True, "message": "stub fill started"}
 
 
@@ -93,8 +93,17 @@ def _run_fill(entry=None):
 
 @router.get("/stub/stream")
 async def stream_fill():
-    """SSE 推送 stub 填充进度"""
+    """SSE 推送 stub 填充进度（只跟踪当前正在运行的任务）"""
+    # 快照启动时刻的状态标识，避免交付上一次运行的 done 信号
+    start_running = _fill_state.get("running", False)
+    start_done = _fill_state.get("done", False)
+
     async def generator():
+        # 如果当前没有任务在跑（且已完成），直接返回空流
+        if start_done and not start_running:
+            yield f"data: {json.dumps({'type': 'idle'})}\n\n"
+            return
+
         sent = 0
         while True:
             logs = _fill_state.get("log", [])
@@ -107,7 +116,8 @@ async def stream_fill():
                 break
             await asyncio.sleep(0.5)
 
-    return StreamingResponse(generator(), media_type="text/event-stream")
+    return StreamingResponse(generator(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.get("/stub/status")

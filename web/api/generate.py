@@ -1,4 +1,5 @@
 """生成 API — Slides + Report"""
+import asyncio
 import sys
 from pathlib import Path
 
@@ -26,7 +27,7 @@ async def generate(body: dict):
 
     try:
         if fmt == "slides":
-            from tools.slides import _load_config, _slug, _SLIDES_PROMPT
+            from tools.slides import _SLIDES_PROMPT
             from tools.search import search_wiki
             from tools.ask import _truncate_entry
             from tools.llm_client import LLMClient
@@ -49,7 +50,7 @@ async def generate(body: dict):
             )
             client = LLMClient(config)
             max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("slides")
-            slides_content = client.call(prompt, max_tokens=max_tokens)
+            slides_content = await asyncio.to_thread(client.call, prompt, max_tokens)
             if "marp: true" not in slides_content:
                 slides_content = "---\nmarp: true\ntheme: default\npaginate: true\n---\n\n" + slides_content
 
@@ -97,7 +98,7 @@ async def generate(body: dict):
 
             client = LLMClient(config)
             max_tokens = config.get("llm", {}).get("max_tokens_by_tool", {}).get("report")
-            report_content = client.call(prompt, max_tokens=max_tokens)
+            report_content = await asyncio.to_thread(client.call, prompt, max_tokens)
 
             if fmt == "report":
                 answers_dir = WIKI_DIR / "answers"

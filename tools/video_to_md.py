@@ -222,6 +222,60 @@ def _build_markdown(info: dict, transcript: str, url: str, source: str) -> tuple
     return filename, frontmatter + body
 
 
+# ─── Programmatic API ───────────────────────────────────────────────────────
+
+def process_video(url: str, output_dir: Path, lang: str = "zh",
+                  use_whisper: bool = False, whisper_model: str = "base") -> Path:
+    """
+    可编程接口（供 web API 调用）。
+    返回保存的 Markdown 文件路径。
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    has_ytdlp = _check_yt_dlp()
+    has_whisper = _check_whisper()
+    stub_only = not has_ytdlp
+
+    info = {}
+    if has_ytdlp:
+        try:
+            info = _get_video_info(url)
+        except Exception:
+            pass
+
+    if "youtube.com" in url or "youtu.be" in url:
+        source_type = "youtube"
+    elif any(x in url for x in ("podcast", "spotify", "anchor")):
+        source_type = "podcast"
+    else:
+        source_type = "media"
+
+    transcript = ""
+    if not stub_only:
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir_str:
+            tmpdir = Path(tmpdir_str)
+            if use_whisper:
+                if has_whisper:
+                    try:
+                        transcript = _transcribe_with_whisper(url, tmpdir, whisper_model)
+                    except Exception:
+                        pass
+            else:
+                try:
+                    transcript = _get_subtitles(url, tmpdir, lang or "zh")
+                    if not transcript and has_whisper:
+                        transcript = _transcribe_with_whisper(url, tmpdir, whisper_model)
+                except Exception:
+                    pass
+
+    filename, content = _build_markdown(info, transcript, url, source_type)
+    output_path = output_dir / filename
+    output_path.write_text(content, encoding="utf-8")
+    return output_path
+
+
 # ─── CLI ────────────────────────────────────────────────────────────────────
 
 @click.command()
