@@ -541,9 +541,15 @@ main() {
       start_web
       ;;
     config)
-      # 仅重新配置
+      # 仅重新配置 — 初始化 PYTHON（未经 install_deps 时需要）
       if [[ -f ".venv/bin/python3" ]]; then
         PYTHON=".venv/bin/python3"
+      else
+        PYTHON=""
+        for py in python3.13 python3.12 python3.11 python3.10 python3; do
+          if command -v "$py" &>/dev/null; then PYTHON="$py"; break; fi
+        done
+        PYTHON="${PYTHON:-python3}"
       fi
       run_config
       test_api
