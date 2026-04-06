@@ -172,6 +172,20 @@ function bindUI() {
   document.getElementById('btn-add').addEventListener('click', () => openDrawer('ingest'));
   document.getElementById('ingest-close').addEventListener('click', () => closeDrawers());
 
+  // 日志抽屉
+  document.getElementById('btn-logs').addEventListener('click', () => openLogsDrawer());
+  document.getElementById('logs-close').addEventListener('click', () => closeDrawers());
+  document.getElementById('logs-clear').addEventListener('click', () => {
+    document.getElementById('logs-body').innerHTML = '';
+  });
+  document.querySelectorAll('.level-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.level-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      logsSetLevel(btn.dataset.level);
+    });
+  });
+
   // 设置抽屉
   document.getElementById('btn-settings').addEventListener('click', () => openDrawer('settings'));
   document.getElementById('settings-close').addEventListener('click', () => closeDrawers());
@@ -505,7 +519,7 @@ function openDrawer(name) {
 }
 
 function closeDrawers() {
-  ['ingest', 'generate', 'settings'].forEach(n => {
+  ['ingest', 'generate', 'settings', 'logs'].forEach(n => {
     document.getElementById(n + '-drawer').classList.remove('open');
   });
   document.getElementById('backdrop').classList.remove('visible');
@@ -862,3 +876,65 @@ function esc(str) {
 window.addEventListener('resize', () => {
   if (state.graphData.nodes.length > 0) renderGraph(state.graphData);
 });
+
+// ── 日志查看器 ────────────────────────────────────────────────
+let _logsES = null;
+let _logsLevel = '';
+
+function openLogsDrawer() {
+  closeDrawers();
+  document.getElementById('logs-drawer').classList.add('open');
+  document.getElementById('backdrop').classList.add('visible');
+  logsStartSSE(_logsLevel);
+}
+
+function logsSetLevel(level) {
+  _logsLevel = level;
+  document.getElementById('logs-body').innerHTML = '';
+  if (_logsES) { _logsES.close(); _logsES = null; }
+  logsStartSSE(level);
+}
+
+function logsStartSSE(level) {
+  if (_logsES) return;   // 已连接
+  const url = '/api/logs/stream' + (level ? `?level=${level}` : '');
+  const es = new EventSource(url);
+  _logsES = es;
+
+  es.onmessage = e => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'ping') return;
+    logsAppendRow(data);
+  };
+  es.onerror = () => {
+    // 自动重连交给浏览器，不需要手动处理
+  };
+
+  // 抽屉关闭时断开
+  const drawer = document.getElementById('logs-drawer');
+  const observer = new MutationObserver(() => {
+    if (!drawer.classList.contains('open')) {
+      es.close();
+      _logsES = null;
+      observer.disconnect();
+    }
+  });
+  observer.observe(drawer, { attributes: true, attributeFilter: ['class'] });
+}
+
+function logsAppendRow(entry) {
+  const body = document.getElementById('logs-body');
+  const autoscroll = document.getElementById('logs-autoscroll').checked;
+
+  const ts = new Date(entry.ts * 1000).toLocaleTimeString('zh-CN', { hour12: false, fractionalSecondDigits: 1 });
+  const row = document.createElement('div');
+  row.className = `log-row lvl-${entry.level}`;
+  row.innerHTML =
+    `<span class="lt">${esc(ts)}</span>` +
+    `<span class="ll">${entry.level.toUpperCase()}</span>` +
+    `<span class="ln" title="${esc(entry.name)}">${esc(entry.name)}</span>` +
+    `<span class="lm">${esc(entry.msg)}</span>`;
+  body.appendChild(row);
+
+  if (autoscroll) body.scrollTop = body.scrollHeight;
+}

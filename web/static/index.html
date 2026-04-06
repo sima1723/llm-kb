@@ -23,6 +23,7 @@
 
     <button class="topbar-btn primary" id="btn-add">+ 添加内容</button>
     <button class="topbar-btn" id="btn-generate">⚡ 生成</button>
+    <button class="topbar-btn" id="btn-logs">📋 日志</button>
     <button class="topbar-btn" id="btn-settings">设置</button>
   </header>
 
@@ -216,6 +217,24 @@
     <button class="topbar-btn primary" id="btn-test-key" style="width:100%">测试连接</button>
     <div id="test-result"></div>
   </div>
+</div>
+
+<!-- 日志查看器抽屉 -->
+<div id="logs-drawer">
+  <header>
+    <span>📋 系统日志</span>
+    <div id="logs-level-bar">
+      <button class="level-btn active" data-level="">ALL</button>
+      <button class="level-btn" data-level="debug">DEBUG</button>
+      <button class="level-btn" data-level="info">INFO</button>
+      <button class="level-btn" data-level="warn">WARN</button>
+      <button class="level-btn" data-level="error">ERROR</button>
+    </div>
+    <label id="logs-autoscroll-label"><input type="checkbox" id="logs-autoscroll" checked> 自动滚动</label>
+    <button id="logs-clear" title="清空显示">清空</button>
+    <button id="logs-close" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;">✕</button>
+  </header>
+  <div id="logs-body"></div>
 </div>
 
 <!-- 图谱 tooltip -->

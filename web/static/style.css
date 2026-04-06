@@ -337,6 +337,64 @@ textarea.url-input:focus { border-color: var(--blue); }
 .radio-opt:has(input:checked) { border-color: var(--blue); color: var(--blue); }
 .radio-opt input { accent-color: var(--blue); }
 
+/* ── Logs drawer ───────────────────────────────────────────── */
+#logs-drawer {
+  position: fixed; top: 0; right: 0; height: 100vh; width: 640px;
+  background: var(--bg); border-left: 1px solid var(--border);
+  z-index: 100; display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform 0.25s ease;
+}
+#logs-drawer.open { transform: translateX(0); }
+#logs-drawer header {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+  font-weight: 700; flex-shrink: 0; min-height: 48px;
+}
+#logs-level-bar { display: flex; gap: 4px; }
+.level-btn {
+  padding: 3px 9px; font-size: 11px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg3); color: var(--text2);
+  font-family: monospace; transition: all 0.1s;
+}
+.level-btn.active       { background: var(--blue);  border-color: var(--blue);  color: #fff; }
+.level-btn[data-level="debug"].active  { background: var(--text2); border-color: var(--text2); }
+.level-btn[data-level="info"].active   { background: var(--blue);  border-color: var(--blue); }
+.level-btn[data-level="warn"].active   { background: var(--yellow);border-color: var(--yellow);color:#000; }
+.level-btn[data-level="error"].active  { background: var(--red);   border-color: var(--red); }
+#logs-autoscroll-label {
+  display: flex; align-items: center; gap: 5px; font-size: 12px;
+  color: var(--text2); cursor: pointer; white-space: nowrap; font-weight: 400;
+}
+#logs-clear {
+  background: none; border: 1px solid var(--border); color: var(--text2);
+  border-radius: 4px; padding: 3px 8px; font-size: 12px; cursor: pointer;
+}
+#logs-clear:hover { color: var(--text); border-color: var(--text2); }
+#logs-body {
+  flex: 1; overflow-y: auto; padding: 0;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px; line-height: 1.6;
+}
+#logs-body::-webkit-scrollbar { width: 5px; }
+#logs-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.log-row {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 2px 14px; border-bottom: 1px solid rgba(48,54,61,0.5);
+}
+.log-row:hover { background: var(--bg2); }
+.log-row .lt  { color: var(--text2); min-width: 68px; font-size: 11px; flex-shrink: 0; }
+.log-row .ll  { min-width: 46px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.log-row .ln  { color: var(--text2); min-width: 120px; max-width: 140px; overflow: hidden;
+                text-overflow: ellipsis; white-space: nowrap; font-size: 11px; flex-shrink: 0; }
+.log-row .lm  { flex: 1; white-space: pre-wrap; word-break: break-all; color: var(--text); }
+.log-row.lvl-debug .ll { color: var(--text2); }
+.log-row.lvl-debug .lm { color: var(--text2); }
+.log-row.lvl-info  .ll { color: var(--blue); }
+.log-row.lvl-warn  .ll { color: var(--yellow); }
+.log-row.lvl-warn  .lm { color: var(--yellow); }
+.log-row.lvl-error .ll { color: var(--red); }
+.log-row.lvl-error .lm { color: var(--red); font-weight: 500; }
+
 /* ── Settings drawer ───────────────────────────────────────── */
 #settings-drawer {
   position: fixed; top: 0; right: 0; height: 100vh; width: 360px;

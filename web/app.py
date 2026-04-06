@@ -1,4 +1,5 @@
 """LLM-KB Web App — FastAPI 入口"""
+import logging
 import sys
 from pathlib import Path
 
@@ -19,8 +20,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 安装内存日志捕获（在路由注册之前）
+from web.api.logs import install_ui_handler
+install_ui_handler(level=logging.DEBUG)
+
 # 注册 API 路由
 from web.api import config, ingest, compile, wiki, query, generate, maintenance
+from web.api import logs as logs_api
 
 app.include_router(config.router, prefix="/api")
 app.include_router(ingest.router, prefix="/api")
@@ -29,6 +35,7 @@ app.include_router(wiki.router, prefix="/api")
 app.include_router(query.router, prefix="/api")
 app.include_router(generate.router, prefix="/api")
 app.include_router(maintenance.router, prefix="/api")
+app.include_router(logs_api.router, prefix="/api")
 
 # 静态文件
 STATIC_DIR = Path(__file__).parent / "static"
